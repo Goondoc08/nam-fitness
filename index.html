@@ -2885,6 +2885,11 @@ async function init() {
 // Start
 checkFirstRun();
 if(getAnthropicKey() && getSheetsKey()) init();
+
+// Service worker
+if('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(()=>{});
+}
 </script>
 </body>
 </html>
