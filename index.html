@@ -1542,13 +1542,18 @@ function updateSessionChip(idx, bb) {
   const opt    = document.getElementById('session-chip-opt');
   const badge  = document.getElementById('session-chip-badge');
 
-  if(dot)  dot.style.background = dc;
-  if(name) { name.textContent = day.name; name.style.color = dc; }
-  if(opt)  opt.textContent = bb !== null ? rule.opt : day.sub;
-  if(badge) {
-    badge.innerHTML = logged
-      ? `<span class="badge badge-green" style="font-size:10px">✓ Logged</span>`
-      : `<span class="badge" style="background:${dc}18;color:${dc};font-size:10px">Day ${day.num}</span>`;
+  if(logged) {
+    const loggedDay = DAYS[logged.dayIdx];
+    const lc = DAY_COLOR[loggedDay?.type] || 'var(--green)';
+    if(dot)  dot.style.background = lc;
+    if(name) { name.textContent = loggedDay?.name || day.name; name.style.color = lc; }
+    if(opt)  opt.textContent = logged.shifted ? '↕ Shifted from cycle day' : (logged.optionName || loggedDay?.sub || '');
+    if(badge) badge.innerHTML = `<span class="badge badge-green" style="font-size:10px">✓ Done</span>`;
+  } else {
+    if(dot)  dot.style.background = dc;
+    if(name) { name.textContent = day.name; name.style.color = dc; }
+    if(opt)  opt.textContent = bb !== null ? rule.opt : day.sub;
+    if(badge) badge.innerHTML = `<span class="badge" style="background:${dc}18;color:${dc};font-size:10px">Day ${day.num}</span>`;
   }
 
   // Stretch chip on Today page
@@ -1564,7 +1569,7 @@ function updateSessionChip(idx, bb) {
       : `<div class="card" style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-color:rgba(176,38,255,.3);margin-bottom:0">
            <div style="width:10px;height:10px;border-radius:50%;background:var(--mobility);flex-shrink:0;opacity:.5"></div>
            <div style="flex:1;font-size:14px;font-weight:700;color:var(--text3)">Stretch · 15–25 min</div>
-           <button onclick="logStretchDone()" style="background:var(--mobility);color:#fff;border:none;border-radius:8px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer">Done</button>
+           <button onclick="logStretchDone()" style="background:transparent;color:var(--mobility);border:1.5px solid var(--mobility);border-radius:8px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer">Done</button>
          </div>`;
   }
 }
@@ -1638,6 +1643,7 @@ function showPage(name, pushState = true) {
   const nav = document.getElementById('nav-'+name);
   if(nav) nav.classList.add('active');
   currentPage = name;
+  if(name === 'trends' && sheetDataGlobal) renderTrends(sheetDataGlobal);
   if(pushState) history.pushState({page:name}, '', '');
   window.scrollTo(0,0);
 }
@@ -1967,7 +1973,11 @@ function renderSessionPage() {
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:${dc};margin-bottom:3px">Cycle Day ${day.num} · ${day.badge}</div>
         <div style="font-size:20px;font-weight:800">${day.name}</div>
       </div>
-      ${logged ? `<span class="badge badge-green" style="flex-shrink:0;margin-top:4px">✓ Logged</span>` : ''}
+      ${logged
+        ? logged.shifted
+          ? `<span class="badge badge-yellow" style="flex-shrink:0;margin-top:4px">↕ Shifted</span>`
+          : `<span class="badge badge-green" style="flex-shrink:0;margin-top:4px">✓ Logged</span>`
+        : ''}
     </div>
     <div style="background:${dt};border-radius:8px;padding:10px 12px;margin-bottom:10px">
       <div style="font-size:13px;font-weight:800;color:${dc};margin-bottom:3px">${rule.opt}</div>
@@ -1975,7 +1985,9 @@ function renderSessionPage() {
       ${bb !== null ? `<div style="font-size:10px;color:var(--text3);margin-top:5px">BB ${bb} · ${skipDay?'Lift B skipped — mobility instead':'recommendation based on current battery'}</div>` : ''}
     </div>
     ${logged
-      ? `<div style="font-size:12px;color:var(--text3)">Logged: <strong style="color:var(--green)">${logged.dayName}</strong>${logged.shifted?' · shifted from cycle day':''}</div>`
+      ? logged.shifted
+        ? `<div style="font-size:12px;color:var(--text3)">Logged: <strong style="color:var(--green)">${logged.dayName}</strong> · shifted from today's cycle day</div>`
+        : ''
       : `<button class="btn btn-green" style="font-size:13px;padding:10px" onclick="openSessionDetail(${todayIdx})">View & Log This Session →</button>`
     }
   </div>`;
@@ -2000,7 +2012,7 @@ function renderSessionPage() {
     return `<div class="${cls}" onclick="openSessionDetail(${i})">
       <div class="session-list-dot" style="background:${c}"></div>
       <div class="session-list-info">
-        <div class="session-list-name" style="${isToday?`color:${c}`:''}">Day ${d.num} · ${d.name}${isLogged?' ✓':''}</div>
+        <div class="session-list-name" style="${isToday?`color:${c}`:''}">Day ${d.num} · ${d.name}</div>
         <div class="session-list-meta">${d.badge} · ${d.sub}</div>
       </div>
       ${isToday ? `<span class="session-list-badge" style="background:${c}18;color:${c}">Today</span>` : ''}
