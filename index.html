@@ -1645,6 +1645,11 @@ window.addEventListener('popstate', function() {
     history.pushState({page:currentPage},'','');
     return;
   }
+  if(currentPage === 'session' && document.getElementById('session-detail-view').style.display !== 'none') {
+    closeSessionDetail();
+    history.pushState({page:'session'},'','');
+    return;
+  }
   const idx = PAGE_ORDER.indexOf(currentPage);
   if(idx > 0) showPage(PAGE_ORDER[idx-1], false);
   else history.back();
