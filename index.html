@@ -1617,6 +1617,7 @@ function updateSessionChip(idx, bb) {
            <div style="width:10px;height:10px;border-radius:50%;background:var(--mobility);flex-shrink:0"></div>
            <div style="flex:1;font-size:14px;font-weight:700;color:var(--mobility)">Stretch</div>
            <span class="badge badge-purple" style="font-size:10px">✓ Done</span>
+           <button onclick="clearStretchLog()" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--text3);font-size:11px;padding:3px 8px;cursor:pointer">Undo</button>
          </div>`
       : `<div class="card" style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-color:rgba(176,38,255,.3);margin-bottom:0">
            <div style="width:10px;height:10px;border-radius:50%;background:var(--mobility);flex-shrink:0;opacity:.5"></div>
@@ -2103,6 +2104,12 @@ function logStretchDone() {
   updateSessionChip(getCycleIdx(), currentBB);
   updateSessionLoggedStatus();
   showToast('Stretch logged ✓');
+}
+function clearStretchLog() {
+  S.del('stretch_log_' + todayISO());
+  renderSessionPage();
+  updateSessionChip(getCycleIdx(), currentBB);
+  showToast('Stretch cleared');
 }
 function saveTodaySessionLog(dayIdx, shifted, optionName) {
   S.setJSON('session_log_' + todayISO(), {
