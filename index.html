@@ -303,6 +303,21 @@ body{
 }
 .adh-dot-label{font-size:8px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;opacity:.7}
 .adh-dot.stretched{box-shadow:0 0 0 2.5px var(--mobility)}
+.adh-dot.tappable{cursor:pointer}
+.adh-dot.tappable:active{opacity:.7}
+
+/* Running log */
+.run-log-item{padding:11px 0;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:10px}
+.run-log-item:last-child{border-bottom:none}
+.run-log-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:5px}
+.run-log-name{font-size:14px;font-weight:700}
+.run-log-meta{font-size:11px;color:var(--text3);margin-top:2px}
+
+/* Export nudge */
+.export-nudge{background:var(--card2);border:1px solid rgba(0,229,255,.25);border-radius:var(--radius);padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;gap:10px}
+.export-nudge-text{flex:1;font-size:13px;color:var(--text2);line-height:1.4}
+.export-nudge-actions{display:flex;gap:6px;flex-shrink:0}
+.export-nudge-btn{font-size:11px;font-weight:700;border:none;border-radius:8px;padding:5px 10px;cursor:pointer}
 
 .corr-item{
   font-size:13px;line-height:1.65;color:var(--text2);
@@ -630,6 +645,15 @@ input:checked ~ .toggle-slider::before{background:var(--lift);transform:translat
     <div class="badge badge-gray" id="cycle-badge">Day — of 6</div>
     <div class="badge badge-gray" id="week-badge">Week — of 12</div>
     <div class="badge badge-gray" id="shift-badge">—</div>
+  </div>
+
+  <!-- Export nudge -->
+  <div class="export-nudge" id="export-nudge" style="display:none">
+    <div class="export-nudge-text">📤 New month — export your data for deeper analysis in Claude</div>
+    <div class="export-nudge-actions">
+      <button class="export-nudge-btn" onclick="dismissExportNudge()" style="background:rgba(255,255,255,.08);color:var(--text2)">Later</button>
+      <button class="export-nudge-btn" onclick="exportData()" style="background:var(--swim);color:#0D0F14">Export</button>
+    </div>
   </div>
 
   <!-- Session card placeholder -->
@@ -1039,6 +1063,12 @@ input:checked ~ .toggle-slider::before{background:var(--lift);transform:translat
     </div>
   </div>
 
+  <!-- Session history / running log -->
+  <div class="card" id="running-log-card" style="display:none">
+    <div class="card-label">📋 Session History</div>
+    <div id="running-log-list"></div>
+  </div>
+
   <!-- Pattern insights -->
   <div class="card" id="insights-card" style="display:none">
     <div class="card-label" style="color:var(--swim)">🔬 Pattern Insights</div>
@@ -1093,8 +1123,24 @@ input:checked ~ .toggle-slider::before{background:var(--lift);transform:translat
 
       <button class="btn btn-green" onclick="saveSettings()">Save Settings</button>
       <div style="height:12px"></div>
+      <button class="btn" onclick="exportData()" style="width:100%;font-size:13px;background:rgba(0,229,255,.12);color:var(--swim);border:1px solid rgba(0,229,255,.25)">📤 Export Data for Analysis</button>
+      <div style="font-size:11px;color:var(--text3);margin-top:6px;margin-bottom:12px">Downloads a JSON file with all your logs — upload to Claude for deeper insights</div>
       <button class="btn btn-outline btn-sm" onclick="clearAllData()" style="width:100%;font-size:12px;color:var(--lift);border-color:rgba(255,51,102,.3)">Clear all local data</button>
     </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     DAY DETAIL MODAL
+══════════════════════════════════════════════════════════ -->
+<div class="overlay" id="day-detail-overlay" onclick="closeDayDetail()">
+  <div class="settings-sheet" id="day-detail-sheet" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-title" id="day-detail-title">—</div>
+      <button class="sheet-close" onclick="closeDayDetail()">✕</button>
+    </div>
+    <div class="sheet-body" id="day-detail-body"></div>
   </div>
 </div>
 
@@ -1651,6 +1697,11 @@ function showPage(name, pushState = true) {
 window.addEventListener('popstate', function() {
   if(document.getElementById('settings-overlay').classList.contains('open')) {
     closeSettings();
+    history.pushState({page:currentPage},'','');
+    return;
+  }
+  if(document.getElementById('day-detail-overlay').classList.contains('open')) {
+    closeDayDetail();
     history.pushState({page:currentPage},'','');
     return;
   }
@@ -2698,12 +2749,15 @@ function renderTrends(data) {
     if(log) { bg = 'var(--green-tint)'; color = 'var(--green)'; icon = '✓'; }
     if(isToday && !log) { bg = 'rgba(255,255,255,.1)'; }
     const ringCls = stretch ? ' stretched' : '';
+    const tappable = log ? ' tappable' : '';
+    const clickAttr = log ? `onclick="showDayDetail('${ds}')"` : '';
     dots.push(`<div style="text-align:center">
-      <div class="adh-dot${ringCls}" style="background:${bg};color:${color};${isToday&&!log?'border:1.5px solid rgba(255,255,255,.2)':''}">${icon}</div>
+      <div class="adh-dot${ringCls}${tappable}" style="background:${bg};color:${color};${isToday&&!log?'border:1.5px solid rgba(255,255,255,.2)':''}" ${clickAttr}>${icon}</div>
       <div style="font-size:8px;color:var(--text3);margin-top:3px;font-weight:600">${lbl}</div>
     </div>`);
   }
   document.getElementById('adherence-dots').innerHTML = dots.join('');
+  renderRunningLog();
 
   // ── Sparklines ─────────────────────────────────────────
   const last7 = daily.filter(r=>r.date).sort((a,b)=>a.date.localeCompare(b.date)).slice(-7);
@@ -2902,8 +2956,156 @@ async function init() {
   }
 }
 
+// ══════════════════════════════════════════════════════════
+//  DAY DETAIL MODAL
+// ══════════════════════════════════════════════════════════
+function showDayDetail(dateStr) {
+  const sLog    = S.getJSON('session_log_' + dateStr);
+  const lLog    = S.getJSON('log_' + dateStr);
+  const stretch = S.getJSON('stretch_log_' + dateStr);
+
+  const d = new Date(dateStr + 'T12:00:00');
+  const label = d.toLocaleDateString('en-US', {weekday:'long', month:'short', day:'numeric'});
+  document.getElementById('day-detail-title').textContent = label;
+
+  let html = '';
+
+  // Session
+  if(sLog) {
+    const dc = DAY_COLOR[DAYS[sLog.dayIdx]?.type] || 'var(--green)';
+    html += `<div style="margin-bottom:16px">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:6px">Session</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+        <div style="width:8px;height:8px;border-radius:50%;background:${dc};flex-shrink:0"></div>
+        <div style="font-size:16px;font-weight:800;color:${dc}">${sLog.dayName}</div>
+        ${sLog.shifted ? `<span class="badge badge-yellow" style="font-size:10px">↕ Shifted</span>` : `<span class="badge badge-green" style="font-size:10px">✓ Done</span>`}
+      </div>
+      ${sLog.optionName ? `<div style="font-size:12px;color:var(--text2);margin-left:16px">${sLog.optionName}</div>` : ''}
+    </div>`;
+  } else {
+    html += `<div style="margin-bottom:16px">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:6px">Session</div>
+      <div style="font-size:13px;color:var(--text3)">No session logged</div>
+    </div>`;
+  }
+
+  // Stretch
+  html += `<div style="margin-bottom:16px;padding-top:12px;border-top:1px solid var(--border)">
+    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:6px">Stretch</div>
+    ${stretch
+      ? `<span class="badge badge-purple" style="font-size:11px">✓ Done · ${new Date(stretch.doneAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}</span>`
+      : `<span style="font-size:13px;color:var(--text3)">Not logged</span>`}
+  </div>`;
+
+  // Lifestyle log
+  if(lLog) {
+    const parts = [];
+    if(lLog.weight)       parts.push(`⚖️ ${lLog.weight} lbs`);
+    if(lLog.alcohol > 0)  parts.push(`🍺 ${lLog.alcohol} drinks`);
+    if(lLog.caffeine > 0) parts.push(`☕ ${lLog.caffeine} coffees`);
+    if(lLog.meals)        parts.push(`🍽️ ${lLog.meals} meals`);
+    html += `<div style="margin-bottom:16px;padding-top:12px;border-top:1px solid var(--border)">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:8px">Lifestyle</div>
+      ${parts.length ? `<div style="display:flex;flex-wrap:wrap;gap:6px">${parts.map(p=>`<span class="badge badge-gray" style="font-size:11px">${p}</span>`).join('')}</div>` : `<div style="font-size:13px;color:var(--text3)">—</div>`}
+      ${lLog.sessionNote ? `<div style="font-size:13px;color:var(--text2);margin-top:10px;line-height:1.5;font-style:italic">"${lLog.sessionNote}"</div>` : ''}
+      ${lLog.acuityNote  ? `<div style="font-size:12px;color:var(--text3);margin-top:6px">Acuity: ${lLog.acuityNote}</div>` : ''}
+    </div>`;
+  }
+
+  document.getElementById('day-detail-body').innerHTML = html || '<div style="color:var(--text3);font-size:13px">Nothing logged this day.</div>';
+  document.getElementById('day-detail-overlay').classList.add('open');
+  history.pushState({page:currentPage, modal:'day-detail'}, '', '');
+}
+
+function closeDayDetail() {
+  document.getElementById('day-detail-overlay').classList.remove('open');
+}
+
+// ══════════════════════════════════════════════════════════
+//  RUNNING LOG
+// ══════════════════════════════════════════════════════════
+function renderRunningLog() {
+  const keys = Object.keys(localStorage)
+    .filter(k => k.startsWith('nam_session_log_'))
+    .map(k => k.replace('nam_session_log_', ''))
+    .sort((a,b) => b.localeCompare(a)); // newest first
+
+  const card = document.getElementById('running-log-card');
+  const list = document.getElementById('running-log-list');
+  if(!keys.length) { if(card) card.style.display='none'; return; }
+  if(card) card.style.display='block';
+
+  list.innerHTML = keys.map(ds => {
+    const log = S.getJSON('session_log_' + ds);
+    if(!log) return '';
+    const dc = DAY_COLOR[DAYS[log.dayIdx]?.type] || 'var(--green)';
+    const d  = new Date(ds + 'T12:00:00');
+    const dateLabel = d.toLocaleDateString('en-US', {weekday:'short', month:'short', day:'numeric'});
+    const stretch = S.getJSON('stretch_log_' + ds);
+    return `<div class="run-log-item" onclick="showDayDetail('${ds}')">
+      <div class="run-log-dot" style="background:${dc}"></div>
+      <div style="flex:1;min-width:0">
+        <div class="run-log-name">${log.dayName}${log.shifted ? ' <span style="font-size:10px;color:var(--cardio)">↕</span>' : ''}</div>
+        <div class="run-log-meta">${dateLabel}${log.optionName ? ' · ' + log.optionName : ''}${stretch ? ' · 🟣 stretch' : ''}</div>
+      </div>
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+    </div>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════════════
+//  EXPORT
+// ══════════════════════════════════════════════════════════
+async function exportData() {
+  showToast('Building export…');
+  const out = { exportedAt: new Date().toISOString(), sessions: {}, lifestyle: {}, stretch: {}, garmin: null };
+
+  Object.keys(localStorage).forEach(k => {
+    if(k.startsWith('nam_session_log_')) { const ds = k.replace('nam_session_log_',''); out.sessions[ds] = S.getJSON('session_log_'+ds); }
+    else if(k.startsWith('nam_log_'))    { const ds = k.replace('nam_log_','');         out.lifestyle[ds] = S.getJSON('log_'+ds); }
+    else if(k.startsWith('nam_stretch_log_')) { const ds = k.replace('nam_stretch_log_',''); out.stretch[ds] = S.getJSON('stretch_log_'+ds); }
+  });
+
+  // Attempt to pull Garmin sheet data
+  try {
+    if(getSheetsKey() && getSheetId()) {
+      const data = await loadAllSheetData();
+      out.garmin = { daily: data.daily, snapshot: data.snap };
+    }
+  } catch(e) { out.garmin = { error: e.message }; }
+
+  const blob = new Blob([JSON.stringify(out, null, 2)], {type:'application/json'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `nam-export-${todayISO()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+
+  S.set('last_export_month', todayISO().slice(0,7));
+  document.getElementById('export-nudge').style.display = 'none';
+  showToast('Export downloaded ✓');
+}
+
+// ══════════════════════════════════════════════════════════
+//  MONTHLY EXPORT NUDGE
+// ══════════════════════════════════════════════════════════
+function checkExportNudge() {
+  const currentMonth = todayISO().slice(0, 7);
+  const lastExport   = S.get('last_export_month') || '';
+  if(lastExport < currentMonth) {
+    document.getElementById('export-nudge').style.display = 'flex';
+  }
+}
+
+function dismissExportNudge() {
+  document.getElementById('export-nudge').style.display = 'none';
+  S.set('last_export_month', todayISO().slice(0,7));
+}
+
 // Start
 checkFirstRun();
+checkExportNudge();
 if(getAnthropicKey() && getSheetsKey()) init();
 
 // Service worker
