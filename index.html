@@ -2403,8 +2403,33 @@ function getRecentLogs(days) {
 }
 
 function clearSessionNote() {
+  // Session note
   document.getElementById('session-note-input').value = '';
   logState.sessionNote = '';
+
+  // ETOH
+  logState.etoh = 0;
+  const etohEl = document.getElementById('etoh-val'); if(etohEl) etohEl.textContent = '0';
+
+  // Caffeine
+  logState.caffeineCups = 0; logState.caffeineTime = '';
+  const cafEl = document.getElementById('caf-val'); if(cafEl) cafEl.textContent = '0';
+  const cafT  = document.getElementById('caf-time'); if(cafT) cafT.value = '';
+
+  // Meals
+  logState.meals = '';
+  ['meal-clean','meal-mostly','meal-offplan'].forEach(id => {
+    const b = document.getElementById(id); if(b) b.className = 'tog-btn';
+  });
+
+  // Acuity shift
+  logState.highAcuity = false; logState.acuityNote = '';
+  const acuityToggle = document.getElementById('acuity-toggle');
+  if(acuityToggle) acuityToggle.checked = false;
+  const acuityNote = document.getElementById('acuity-note-input');
+  if(acuityNote) acuityNote.value = '';
+  const acuityWrap = document.getElementById('acuity-note-wrap');
+  if(acuityWrap) acuityWrap.style.display = 'none';
 }
 
 function saveLog() {
