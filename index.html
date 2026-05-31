@@ -2633,11 +2633,11 @@ function renderRecentLogs() {
   const rows = logs.map(log => {
     const d     = new Date(log.date+'T12:00:00');
     const label = d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
-    const sIcon = log.sessionDone==='done'   ? `<span class="badge badge-green" style="font-size:10px;padding:1px 6px">✓</span>`
-                : log.sessionDone==='modified'? `<span class="badge badge-yellow" style="font-size:10px;padding:1px 6px">~</span>`
-                : log.sessionDone==='skipped' ? `<span class="badge badge-red" style="font-size:10px;padding:1px 6px">✗</span>`
-                : '—';
-    const etoh  = log.etoh > 0 ? `<span class="badge ${log.etoh<=2?'badge-yellow':'badge-red'}" style="font-size:10px;padding:1px 6px">${log.etoh}</span>` : '—';
+    const sLog  = S.getJSON('session_log_' + log.date);
+    const sIcon = sLog
+      ? `<span class="badge badge-green" style="font-size:10px;padding:1px 6px" title="${sLog.dayName}${sLog.shifted?' · shifted':''}">✓</span>`
+      : '—';
+    const etoh  = log.etoh > 0 ? `<span class="badge ${log.etoh<=2?'badge-yellow':'badge-red'}" style="font-size:10px;padding:1px 6px">${log.etoh}</span>` : `<span style="font-size:11px;color:var(--text3)">0</span>`;
     const caf   = log.caffeineCups > 0 ? `${log.caffeineCups} ${CAF_SHORT[log.caffeineTime]||''}` : '—';
     const meal  = {clean:'✅',mostly:'🟡',offplan:'🔴','':'—'}[log.meals||''];
     const wt    = log.weight ? `${log.weight}` : '—';
