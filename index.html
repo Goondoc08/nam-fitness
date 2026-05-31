@@ -2745,13 +2745,25 @@ function buildCoachingContext(data) {
     if(parts.length) todayCtx = parts.join(' ');
   }
 
+  // Shift context — explain deliberate shift so coach doesn't misread it
+  const todaySessionLog = S.getJSON('session_log_' + todayISO());
+  let shiftCtx = '';
+  if(todaySessionLog?.shifted) {
+    const scheduledDay = DAYS[idx];
+    const doneDay = DAYS[todaySessionLog.dayIdx];
+    shiftCtx = `\nSHIFT NOTE: Nicholas deliberately moved ${doneDay.name} (Cycle Day ${doneDay.num}) to today. Today's scheduled day was ${scheduledDay.name} (Day ${scheduledDay.num}). This is an intentional 48/96 scheduling decision — never treat it as a mistake or poor judgment.`;
+  }
+
+  const bbWake = row.bb_wake || '—';
+  const bbCurrent = snap.bb_current || bb || '—';
+
   return {
     profile:`Nicholas: 39yo firefighter, Pearland TX, 48/96 shift schedule. ~235 lbs, down ~60 lbs. Recomping — building muscle while losing fat. Chronic sleep deficit ~2h20min nightly for 12+ months. HRV baseline 27–30ms (33ms+ = strong, under 25ms = flag). Body Battery rarely exceeds 65. No overhead pressing ever — old shoulder injury, floor press is the permanent substitute.`,
     today:`Week ${weekNum} of 12. Cycle Day ${day.num} — ${day.name} (${day.badge}).
 Session recommendation: "${rule.opt}" — ${rule.desc}
-BB: ${bb??'—'} | HRV: ${row.hrv_ms||snap.hrv||'—'}ms | Sleep: ${row.sleep_hrs||'—'} hrs, score ${row.sleep_score||'—'}/100
+BB at wake: ${bbWake} (decision-making BB) | BB current: ${bbCurrent} | HRV: ${row.hrv_ms||snap.hrv||'—'}ms | Sleep: ${row.sleep_hrs||'—'} hrs, score ${row.sleep_score||'—'}/100
 Training readiness: ${snap.training_readiness||row.training_readiness||'—'} | Training status: ${snap.training_status||row.training_status||'—'} | VO₂: ${row.vo2_max||snap.vo2_max||'—'}
-Resting HR: ${snap.resting_hr||row.resting_hr||'—'} | Stress: ${snap.avg_stress||row.avg_stress||'—'}`,
+Resting HR: ${snap.resting_hr||row.resting_hr||'—'} | Stress: ${snap.avg_stress||row.avg_stress||'—'}${shiftCtx}`,
     lifestyleCtx,
     todayCtx,
     liftWeights:`Lift A working weights: Squat ${LIFT_DEFS.liftA[0].default} / Bench ${LIFT_DEFS.liftA[1].default} / Row ${LIFT_DEFS.liftA[2].default} lbs. Lift B: Deadlift ${LIFT_DEFS.liftB[0].default} / Floor Press ${LIFT_DEFS.liftB[1].default} / Lat Pull ${LIFT_DEFS.liftB[2].default} lbs.`
@@ -2790,7 +2802,7 @@ async function generateCoachingNote(forceRefresh = false) {
 
   const systemPrompt = period === 'morning'
     ? `You are Nicholas's personal fitness coach. Write a warm, direct 2–3 sentence morning coaching note. Reference his BB-adjusted session recommendation and at least one specific metric (HRV, sleep, readiness). If a high-acuity work event was logged yesterday, acknowledge it briefly — one sentence max, then focus on today. No generic motivation — sound like a coach who's been following his journey for weeks.`
-    : `You are Nicholas's personal fitness coach. Write a warm, direct 2–3 sentence evening note reviewing how the day went. Reference what was logged today if available. Focus on recovery for tomorrow and one specific thing he can do tonight (sleep timing, nutrition, wind-down). No generic motivation.`;
+    : `You are Nicholas's personal fitness coach. Write a warm, direct 2–3 sentence evening note reviewing how the day went. Reference what was logged today if available. Use current Body Battery (not wake BB) to calibrate tonight's recovery advice — low current BB means earlier bed, wind-down now; higher current BB means standard recovery is fine. Give one specific actionable recommendation for tonight. No generic motivation.`;
 
   const userMsg = `${ctx.profile}
 
