@@ -1,6 +1,6 @@
 {
   "name": "NAM Fitness",
-  "short_name": "NAM Fitness",
+  "short_name": "NAM Fit",
   "description": "Personal daily fitness brief and training tracker",
   "start_url": "/nam-fitness/",
   "scope": "/nam-fitness/",
