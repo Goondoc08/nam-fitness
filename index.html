@@ -1544,39 +1544,44 @@ function renderMetrics(data) {
       vo2 >= 34 ? 'var(--green)' : vo2 >= 32 ? 'var(--cardio)' : 'var(--lift)';
   }
 
-  // Intensity Minutes
-  const intMod = n(snap?.intensity_moderate ?? todayRow?.intensity_moderate);
-  const intVig = n(snap?.intensity_vigorous ?? todayRow?.intensity_vigorous);
+  // Intensity Minutes — n() applied to each source separately so empty strings fall through
+  const intMod = n(snap?.intensity_moderate) ?? n(todayRow?.intensity_moderate);
+  const intVig = n(snap?.intensity_vigorous) ?? n(todayRow?.intensity_vigorous);
 
-  // Weekly total — sum moderate + (vigorous × 2) for each day in the current Mon–Sun week
-  // from the daily log rows. Vigorous counts double per WHO/Garmin guidelines.
+  // Weekly total — sum moderate + (vigorous × 2) for each day in the current Mon–Sun week.
+  // Daily log rows supply historical days; snapshot supplies today's live values.
   const intWk = (() => {
     const daily = data?.daily || [];
-    if(!daily.length) return null;
     const now = new Date();
-    const dow  = now.getDay(); // 0=Sun
+    const dow  = now.getDay();
     const mondayOffset = dow === 0 ? -6 : 1 - dow;
-    const weekDates = [];
+    const weekDates = new Set();
     for(let i = 0; i < 7; i++) {
       const d = new Date(now);
       d.setDate(now.getDate() + mondayOffset + i);
-      weekDates.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
+      weekDates.add(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
     }
     let total = 0, hasAny = false;
+    const datesAdded = new Set();
     for(const row of daily) {
-      if(!weekDates.includes(row.date)) continue;
+      if(!weekDates.has(row.date)) continue;
       const mod = n(row.intensity_moderate);
       const vig = n(row.intensity_vigorous);
-      if(mod !== null) { total += mod; hasAny = true; }
-      if(vig !== null) { total += vig * 2; hasAny = true; }
+      if(mod !== null || vig !== null) {
+        if(mod !== null) total += mod;
+        if(vig !== null) total += vig * 2;
+        hasAny = true;
+        datesAdded.add(row.date);
+      }
     }
-    // Also add today's snapshot values if not already in daily log
-    const todayInLog = daily.some(r => r.date === todayISO() && (n(r.intensity_moderate) !== null || n(r.intensity_vigorous) !== null));
-    if(!todayInLog) {
-      const sm = n(snap?.intensity_moderate);
-      const sv = n(snap?.intensity_vigorous);
-      if(sm !== null) { total += sm; hasAny = true; }
-      if(sv !== null) { total += sv * 2; hasAny = true; }
+    // Snapshot covers today's live data — use it if today's date isn't already in daily rows
+    // (daily rows are always yesterday and older since full sync writes yesterday's data)
+    const sm = n(snap?.intensity_moderate);
+    const sv = n(snap?.intensity_vigorous);
+    if((sm !== null || sv !== null) && !datesAdded.has(todayISO())) {
+      if(sm !== null) total += sm;
+      if(sv !== null) total += sv * 2;
+      hasAny = true;
     }
     return hasAny ? total : null;
   })();
