@@ -1544,13 +1544,9 @@ function renderMetrics(data) {
       vo2 >= 34 ? 'var(--green)' : vo2 >= 32 ? 'var(--cardio)' : 'var(--lift)';
   }
 
-  // Intensity Minutes — n() applied to each source separately so empty strings fall through
-  const intMod = n(snap?.intensity_moderate) ?? n(todayRow?.intensity_moderate);
-  const intVig = n(snap?.intensity_vigorous) ?? n(todayRow?.intensity_vigorous);
-
-  // Weekly total — sum moderate + (vigorous × 2) for each day in the current Mon–Sun week.
-  // Daily log rows supply historical days; snapshot supplies today's live values.
-  const intWk = (() => {
+  // Intensity Minutes — all three values (mod, vig, weekly total) come from the weekly sum.
+  // Daily log rows supply Mon–yesterday; snapshot supplies today's running total.
+  const { intMod, intVig, intWk } = (() => {
     const daily = data?.daily || [];
     const now = new Date();
     const dow  = now.getDay();
@@ -1561,29 +1557,29 @@ function renderMetrics(data) {
       d.setDate(now.getDate() + mondayOffset + i);
       weekDates.add(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
     }
-    let total = 0, hasAny = false;
+    let totalMod = 0, totalVig = 0, hasAny = false;
     const datesAdded = new Set();
     for(const row of daily) {
       if(!weekDates.has(row.date)) continue;
       const mod = n(row.intensity_moderate);
       const vig = n(row.intensity_vigorous);
       if(mod !== null || vig !== null) {
-        if(mod !== null) total += mod;
-        if(vig !== null) total += vig * 2;
+        if(mod !== null) totalMod += mod;
+        if(vig !== null) totalVig += vig;
         hasAny = true;
         datesAdded.add(row.date);
       }
     }
-    // Snapshot covers today's live data — use it if today's date isn't already in daily rows
-    // (daily rows are always yesterday and older since full sync writes yesterday's data)
+    // Add today from snapshot (daily rows are always yesterday and older)
     const sm = n(snap?.intensity_moderate);
     const sv = n(snap?.intensity_vigorous);
     if((sm !== null || sv !== null) && !datesAdded.has(todayISO())) {
-      if(sm !== null) total += sm;
-      if(sv !== null) total += sv * 2;
+      if(sm !== null) totalMod += sm;
+      if(sv !== null) totalVig += sv;
       hasAny = true;
     }
-    return hasAny ? total : null;
+    if(!hasAny) return { intMod: null, intVig: null, intWk: null };
+    return { intMod: totalMod, intVig: totalVig, intWk: totalMod + totalVig * 2 };
   })();
 
   if(intMod !== null) {
