@@ -3067,9 +3067,11 @@ function renderTrends(data) {
   // since sleep lives in the snapshot until tomorrow's 6 AM full sync writes it to the daily row.
   const snap = data?.snap || {};
   const last7raw = daily.filter(r=>r.date).sort((a,b)=>a.date.localeCompare(b.date)).slice(-7);
+  // Sleep lives in the snapshot until tomorrow's 6 AM full sync writes it to the daily row.
+  // The most recent daily row is yesterday's date — overlay snapshot sleep onto it if missing.
+  const mostRecentDate = last7raw.length ? last7raw[last7raw.length - 1].date : null;
   const last7 = last7raw.map(r => {
-    if(r.date !== todayISO()) return r;
-    // Merge snapshot sleep fields onto today's row if the row is missing them
+    if(r.date !== mostRecentDate) return r;
     return {
       ...r,
       sleep_score: n(r.sleep_score) !== null ? r.sleep_score : (snap.sleep_score || r.sleep_score),
