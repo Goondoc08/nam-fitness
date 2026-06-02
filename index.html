@@ -2696,12 +2696,27 @@ async function askClaude(system, userContent) {
 function notePeriod() {
   const h = new Date().getHours();
   if(h >= 17) return 'evening';
-  if(h >= 5)  return 'morning';
-  return null; // before 5am — no note yet
+  if(h < 5)   return null; // overnight — no note yet
+
+  // Daytime: morning note only fires once Garmin has recorded bb_wake.
+  // This handles variable wake times (shift / home / post-shift).
+  const snap = sheetDataGlobal?.snap || {};
+  const row  = sheetDataGlobal?.todayRow || {};
+  const bbWakeVal = parseFloat(snap.bb_wake) || parseFloat(row.bb_wake);
+  if(bbWakeVal > 0) return 'morning';
+
+  // Noon fallback — if Garmin still hasn't synced wake data by midday,
+  // generate anyway so the note isn't blocked all day.
+  if(h >= 12) return 'morning_no_wake';
+
+  return 'waiting'; // data not ready yet
 }
 
 function noteKey(period) {
-  return `coaching_${period}_${todayISO()}`;
+  // morning_no_wake shares the same cache key as morning so it's not re-generated
+  // once real wake data arrives and the period upgrades to 'morning'.
+  const p = period === 'morning_no_wake' ? 'morning' : period;
+  return `coaching_${p}_${todayISO()}`;
 }
 
 function buildCoachingContext(data) {
@@ -2754,70 +2769,126 @@ function buildCoachingContext(data) {
     shiftCtx = `\nSHIFT NOTE: Nicholas deliberately moved ${doneDay.name} (Cycle Day ${doneDay.num}) to today. Today's scheduled day was ${scheduledDay.name} (Day ${scheduledDay.num}). This is an intentional 48/96 scheduling decision — never treat it as a mistake or poor judgment.`;
   }
 
-  const bbWake = row.bb_wake || '—';
-  const bbCurrent = snap.bb_current || bb || '—';
+  const bbWake    = parseFloat(snap.bb_wake) || parseFloat(row.bb_wake) || null;
+  const bbCurrent = bb || parseFloat(snap.bb_current) || null;
+  const noWakeFlag = !bbWake ? ' ⚠️ Wake BB unavailable — Garmin sync may not have captured wake event.' : '';
+
+  // Parse activities from activities_json — yesterday's from daily row, today's from snapshot
+  function parseActJson(jsonStr) {
+    if(!jsonStr || jsonStr === '[]') return [];
+    try { return JSON.parse(jsonStr); } catch(e) { return []; }
+  }
+  const yesterdayActs = parseActJson(row.activities_json);
+  const todayActs     = parseActJson(snap.activities_json);
+
+  function formatActs(acts) {
+    if(!acts.length) return 'None recorded.';
+    return acts.map(a => {
+      const parts = [a.activity_name];
+      if(a.duration_min) parts.push(`${a.duration_min} min`);
+      if(a.avg_hr)       parts.push(`avg HR ${a.avg_hr}`);
+      if(a.calories)     parts.push(`${a.calories} kcal`);
+      if(a.distance_km)  parts.push(`${a.distance_km} km`);
+      if(a.extra)        parts.push(a.extra);
+      return parts.join(' · ');
+    }).join('; ');
+  }
+
+  // Pull actual logged lift weights from localStorage — fall back to defaults
+  function liftWeightStr(session) {
+    const logs = recentLifts(session, 1);
+    const last  = logs[0]?.weights;
+    const defs  = LIFT_DEFS[session];
+    return defs.map(d => `${d.name} ${last?.[d.key] ?? d.default}`).join(' / ') + ' lbs';
+  }
 
   return {
     profile:`Nicholas: 39yo firefighter, Pearland TX, 48/96 shift schedule. ~235 lbs, down ~60 lbs. Recomping — building muscle while losing fat. Chronic sleep deficit ~2h20min nightly for 12+ months. HRV baseline 27–30ms (33ms+ = strong, under 25ms = flag). Body Battery rarely exceeds 65. No overhead pressing ever — old shoulder injury, floor press is the permanent substitute.`,
     today:`Week ${weekNum} of 12. Cycle Day ${day.num} — ${day.name} (${day.badge}).
 Session recommendation: "${rule.opt}" — ${rule.desc}
-BB at wake: ${bbWake} (decision-making BB) | BB current: ${bbCurrent} | HRV: ${row.hrv_ms||snap.hrv||'—'}ms | Sleep: ${row.sleep_hrs||'—'} hrs, score ${row.sleep_score||'—'}/100
+BB at wake: ${bbWake ?? '—'} (decision-making BB)${noWakeFlag} | BB current: ${bbCurrent ?? '—'} | HRV: ${row.hrv_ms||'—'}ms | Sleep: ${row.sleep_hrs||'—'} hrs, score ${row.sleep_score||'—'}/100
 Training readiness: ${snap.training_readiness||row.training_readiness||'—'} | Training status: ${snap.training_status||row.training_status||'—'} | VO₂: ${row.vo2_max||snap.vo2_max||'—'}
 Resting HR: ${snap.resting_hr||row.resting_hr||'—'} | Stress: ${snap.avg_stress||row.avg_stress||'—'}${shiftCtx}`,
     lifestyleCtx,
     todayCtx,
-    liftWeights:`Lift A working weights: Squat ${LIFT_DEFS.liftA[0].default} / Bench ${LIFT_DEFS.liftA[1].default} / Row ${LIFT_DEFS.liftA[2].default} lbs. Lift B: Deadlift ${LIFT_DEFS.liftB[0].default} / Floor Press ${LIFT_DEFS.liftB[1].default} / Lat Pull ${LIFT_DEFS.liftB[2].default} lbs.`
+    yesterdayActivities: `Yesterday's Garmin activities: ${formatActs(yesterdayActs)}`,
+    todayActivities:     `Today's Garmin activities so far: ${formatActs(todayActs)}`,
+    liftWeights:`Lift A current weights: ${liftWeightStr('liftA')}. Lift B: ${liftWeightStr('liftB')}.`
   };
 }
 
 async function generateCoachingNote(forceRefresh = false) {
-  const period = notePeriod();
+  const period  = notePeriod();
+  const textEl  = document.getElementById('coaching-text');
+  const labelEl = document.getElementById('coaching-label');
 
+  // Overnight — no note yet
   if(!period) {
-    const textEl = document.getElementById('coaching-text');
-    const labelEl = document.getElementById('coaching-label');
     if(labelEl) labelEl.textContent = "Coach's Note";
-    if(textEl) textEl.innerHTML = `<span style="font-size:13px;color:var(--text3)">Morning note arrives at 5 AM.</span>`;
+    if(textEl)  textEl.innerHTML = `<span style="font-size:13px;color:var(--text3)">Morning note arrives once Garmin logs your wake.</span>`;
+    return;
+  }
+
+  // Waiting for bb_wake — data not ready yet
+  if(period === 'waiting') {
+    if(labelEl) labelEl.textContent = "Coach's Note";
+    if(textEl)  textEl.innerHTML = `
+      <span style="font-size:13px;color:var(--text3)">Waiting for Garmin wake data…</span>
+      <button onclick="loadSheetData().then(generateCoachingNote)" style="margin-left:10px;background:none;border:1px solid var(--border2);color:var(--text2);border-radius:6px;padding:2px 8px;font-size:11px;cursor:pointer">↻ Check</button>`;
     return;
   }
 
   const key    = noteKey(period);
   const cached = S.getJSON(key);
 
-  // Show cached if available and not forcing refresh
+  // Show cached — but if we now have bb_wake and the cached note was generated
+  // under the noon fallback (no wake data), regenerate with the real value.
   if(cached && !forceRefresh) {
-    renderCoachingNote(cached.text, cached.generatedAt, period, true);
-    return;
+    const hadNoWake = cached.noWake;
+    const snap      = sheetDataGlobal?.snap || {};
+    const row       = sheetDataGlobal?.todayRow || {};
+    const nowHasWake = parseFloat(snap.bb_wake) || parseFloat(row.bb_wake);
+    if(hadNoWake && nowHasWake) {
+      // Wake data arrived after the fallback note — silently regenerate
+    } else {
+      renderCoachingNote(cached.text, cached.generatedAt, period, true);
+      return;
+    }
   }
 
-  // Show loading state
-  const textEl = document.getElementById('coaching-text');
+  // Loading state
   if(textEl) textEl.innerHTML = `
     <div class="skeleton" style="width:100%;height:13px"></div>
     <div class="skeleton" style="width:85%;height:13px;margin-top:6px"></div>
     <div class="skeleton" style="width:60%;height:13px;margin-top:6px"></div>`;
 
-  const data = sheetDataGlobal;
-  const ctx  = buildCoachingContext(data);
+  const data       = sheetDataGlobal;
+  const ctx        = buildCoachingContext(data);
+  const isNoWake   = period === 'morning_no_wake';
+  const isMorning  = period === 'morning' || isNoWake;
 
-  const systemPrompt = period === 'morning'
-    ? `You are Nicholas's personal fitness coach. Write a warm, direct 2–3 sentence morning coaching note. Reference his BB-adjusted session recommendation and at least one specific metric (HRV, sleep, readiness). If a high-acuity work event was logged yesterday, acknowledge it briefly — one sentence max, then focus on today. No generic motivation — sound like a coach who's been following his journey for weeks.`
-    : `You are Nicholas's personal fitness coach. Write a warm, direct 2–3 sentence evening note reviewing how the day went. Reference what was logged today if available. Use current Body Battery (not wake BB) to calibrate tonight's recovery advice — low current BB means earlier bed, wind-down now; higher current BB means standard recovery is fine. Give one specific actionable recommendation for tonight. No generic motivation.`;
+  const systemPrompt = isMorning
+    ? `You are Nicholas's personal fitness coach. Write a warm, direct 2–3 sentence morning coaching note. His wake Body Battery is the primary decision signal for today's session — reference it specifically and tie it to the session recommendation. Mention at least one other metric (HRV, sleep, readiness). If a high-acuity work event was logged yesterday, one sentence max on that, then focus on today. No generic motivation — sound like a coach who's been following his journey for weeks.${isNoWake ? ' Note: wake BB was unavailable this morning — do not reference it as if it exists.' : ''}`
+    : `You are Nicholas's personal fitness coach. Write a warm, direct 2–3 sentence evening note reviewing how the day went. Reference what was actually logged today (session and any Garmin activities) — do not assume the scheduled session was done if a different one or none was logged. Use current Body Battery to calibrate tonight's recovery advice. Give one specific actionable recommendation for tonight or tomorrow morning. No generic motivation.`;
 
   const userMsg = `${ctx.profile}
 
 TODAY: ${ctx.today}
 
 YESTERDAY'S LOG: ${ctx.lifestyleCtx}
+${ctx.yesterdayActivities}
+
 TODAY'S LOG: ${ctx.todayCtx}
+${ctx.todayActivities}
+
 ${ctx.liftWeights}
 
 KEY PRINCIPLE: Body Battery over schedule. Sleep over training. Longevity is the goal.`;
 
   try {
     const text = await askClaude(systemPrompt, userMsg);
-    S.setJSON(key, {text, generatedAt: new Date().toISOString(), period});
-    renderCoachingNote(text, new Date().toISOString(), period, false);
+    S.setJSON(key, {text, generatedAt: new Date().toISOString(), period, noWake: isNoWake});
+    renderCoachingNote(text, new Date().toISOString(), isMorning ? 'morning' : period, false);
   } catch(e) {
     console.error('Coaching note error:', e);
     if(textEl) textEl.innerHTML = `<span style="color:var(--text3);font-size:13px">Could not generate note — ${e.message}</span>`;
