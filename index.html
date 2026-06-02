@@ -594,6 +594,10 @@ input:checked ~ .toggle-slider::before{background:var(--lift);transform:translat
 .color-mobility{color:var(--mobility)}
 .color-orange  {color:var(--orange)}
 .color-green   {color:var(--green)}
+
+/* ── Orange toggle variant (nicotine patches) ─────────────── */
+input:checked ~ .toggle-slider-orange{background:var(--orange-tint);border-color:var(--orange)}
+input:checked ~ .toggle-slider-orange::before{background:var(--orange);transform:translateX(21px)}
 </style>
 </head>
 <body>
@@ -1151,6 +1155,100 @@ input:checked ~ .toggle-slider::before{background:var(--lift);transform:translat
 </div>
 
 <!-- ══════════════════════════════════════════════════════════
+     NICOTINE PAGE
+══════════════════════════════════════════════════════════ -->
+<div id="page-nic" class="page">
+  <div class="top-bar">
+    <div>
+      <div class="page-title">Nicotine</div>
+      <div class="page-sub" id="nic-date-sub">—</div>
+    </div>
+    <div id="nic-saved-chip" style="display:none">
+      <span class="badge badge-green">✓ Saved</span>
+    </div>
+  </div>
+
+  <!-- Streak card -->
+  <div class="card">
+    <div class="card-label">🔥 Cessation Streak</div>
+    <div style="display:flex;align-items:flex-end;gap:20px;flex-wrap:wrap">
+      <div>
+        <div style="font-size:52px;font-weight:800;line-height:1" id="nic-streak-val">—</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:5px;font-weight:600;text-transform:uppercase;letter-spacing:.05em">days on track</div>
+      </div>
+      <div style="flex:1;min-width:120px">
+        <div id="nic-goal-badge" style="margin-bottom:6px"></div>
+        <div style="font-size:12px;color:var(--text2);line-height:1.55" id="nic-phase-note"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Date selector -->
+  <div style="display:flex;gap:6px;margin-bottom:14px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none">
+    <button class="tog-btn active act-blue" id="nic-date-today" onclick="switchNicDate(0)">Today</button>
+    <button class="tog-btn" id="nic-date-1" onclick="switchNicDate(1)">Yesterday</button>
+    <button class="tog-btn" id="nic-date-2" onclick="switchNicDate(2)">2 days ago</button>
+    <button class="tog-btn" id="nic-date-3" onclick="switchNicDate(3)">3 days ago</button>
+  </div>
+
+  <!-- Log card -->
+  <div class="card" style="margin-bottom:12px">
+
+    <!-- Lozenge stepper -->
+    <div class="log-row">
+      <div>
+        <div class="log-row-label">🟡 Lozenges</div>
+        <div id="nic-lozenge-badge-wrap" style="margin-top:4px"></div>
+      </div>
+      <div class="stepper">
+        <button class="stepper-btn" onclick="adjustNic(-1)">−</button>
+        <div class="stepper-val" id="nic-lozenge-val">0</div>
+        <button class="stepper-btn" onclick="adjustNic(1)">+</button>
+      </div>
+    </div>
+
+    <!-- Night patch -->
+    <div class="log-row">
+      <div>
+        <div class="log-row-label">🌙 Night Patch</div>
+        <div class="log-row-sub">Worn overnight</div>
+      </div>
+      <label class="toggle-switch">
+        <input type="checkbox" id="nic-patch-night" onchange="nicState.patchNight=this.checked">
+        <span class="toggle-slider toggle-slider-orange"></span>
+      </label>
+    </div>
+
+    <!-- Day patch -->
+    <div style="padding-top:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div class="log-row-label">☀️ Day Patch</div>
+          <div class="log-row-sub">Worn during the day</div>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="nic-patch-day" onchange="nicState.patchDay=this.checked">
+          <span class="toggle-slider toggle-slider-orange"></span>
+        </label>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Zero Day -->
+  <button class="btn btn-outline" onclick="prefillNicZero()" style="margin-bottom:12px;color:var(--green);border-color:rgba(0,230,118,.3)">
+    🚭 Zero Day — pre-fill smoke-free
+  </button>
+
+  <!-- Save -->
+  <div class="save-btn-wrap">
+    <button class="btn btn-green" onclick="saveNic()">💾 Save Nicotine Log</button>
+  </div>
+
+  <div style="height:16px"></div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
      BOTTOM NAV
 ══════════════════════════════════════════════════════════ -->
 <nav class="bottom-nav">
@@ -1169,6 +1267,10 @@ input:checked ~ .toggle-slider::before{background:var(--lift);transform:translat
   <button class="nav-btn" onclick="showPage('trends')" id="nav-trends">
     <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
     Trends
+  </button>
+  <button class="nav-btn" onclick="showPage('nic')" id="nav-nic">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><line x1="6.5" y1="17.5" x2="17.5" y2="6.5"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="14" y1="11.5" x2="16.2" y2="13"/></svg>
+    Nicotine
   </button>
 </nav>
 
@@ -1726,7 +1828,7 @@ function renderSessionDesc(idx, bb) {
 // ══════════════════════════════════════════════════════════
 //  NAVIGATION
 // ══════════════════════════════════════════════════════════
-const PAGE_ORDER = ['today','session','log','trends'];
+const PAGE_ORDER = ['today','session','log','trends','nic'];
 let currentPage = 'today';
 let swipeBlocked = false;
 
@@ -1739,6 +1841,7 @@ function showPage(name, pushState = true) {
   if(nav) nav.classList.add('active');
   currentPage = name;
   if(name === 'trends' && sheetDataGlobal) renderTrends(sheetDataGlobal);
+  if(name === 'nic') renderNicPage();
   if(pushState) history.pushState({page:name}, '', '');
   window.scrollTo(0,0);
 }
@@ -3405,6 +3508,158 @@ async function exportData() {
   S.set('last_export_month', todayISO().slice(0,7));
   document.getElementById('export-nudge').style.display = 'none';
   showToast('Export downloaded ✓');
+}
+
+// ══════════════════════════════════════════════════════════
+//  NICOTINE TRACKING
+// ══════════════════════════════════════════════════════════
+const NIC_START = '2026-06-05'; // streak counting begins here
+
+let nicState    = { lozenges:0, patchNight:false, patchDay:false };
+let nicDateOffset = 0;
+
+function nicTargetDate() { return offsetISO(-nicDateOffset); }
+
+function getNicGoal(dateStr) {
+  const d = new Date(dateStr+'T12:00:00');
+  const y = d.getFullYear(), m = d.getMonth()+1;
+  if(y > 2026 || (y===2026 && m >= 12)) return 0;
+  if(y===2026 && m === 11) return 3;
+  if(y===2026 && m === 10) return 5;
+  if(y===2026 && (m===8 || m===9)) return 15;
+  return 24; // Jun–Jul 2026 (and before)
+}
+
+function getNicBadgeClass(lozenges, goal) {
+  if(goal === 0) return lozenges === 0 ? 'badge-green' : 'badge-red';
+  if(lozenges > goal) return 'badge-red';
+  if(lozenges >= Math.ceil(goal * 0.8)) return 'badge-yellow';
+  return 'badge-green';
+}
+
+function getNicStreak() {
+  // If today not yet logged, don't penalise — start from yesterday
+  const hasTodayLog = !!S.getJSON('nic_' + todayISO());
+  let streak = 0;
+  for(let i = hasTodayLog ? 0 : 1; i < 400; i++) {
+    const dateStr = offsetISO(-i);
+    if(dateStr < NIC_START) break;
+    const entry = S.getJSON('nic_' + dateStr);
+    if(!entry) break;
+    if((entry.lozenges||0) <= getNicGoal(dateStr)) streak++;
+    else break;
+  }
+  return streak;
+}
+
+function getNicPhaseLabel(dateStr) {
+  const goal = getNicGoal(dateStr);
+  if(goal === 0)  return 'Phase 5 · Dec 2026 · Target: 0/day';
+  if(goal === 3)  return 'Phase 4 · Nov 2026 · Target: 3/day';
+  if(goal === 5)  return 'Phase 3 · Oct 2026 · Target: 5/day';
+  if(goal === 15) return 'Phase 2 · Aug–Sep 2026 · Target: 15/day';
+  return 'Phase 1 · Jun–Jul 2026 · Target: 24/day';
+}
+
+function switchNicDate(offset) {
+  nicDateOffset = offset;
+  [0,1,2,3].forEach(i => {
+    const el = document.getElementById(i===0?'nic-date-today':`nic-date-${i}`);
+    if(el) el.className = 'tog-btn'+(i===offset?' active act-blue':'');
+  });
+  populateNicForm(nicTargetDate());
+  updateNicDateSub();
+}
+
+function adjustNic(delta) {
+  nicState.lozenges = Math.max(0, Math.min(60, (nicState.lozenges||0) + delta));
+  const el = document.getElementById('nic-lozenge-val');
+  if(el) el.textContent = nicState.lozenges;
+  updateNicBadge();
+}
+
+function updateNicBadge() {
+  const goal = getNicGoal(nicTargetDate());
+  const loz  = nicState.lozenges||0;
+  const cls  = getNicBadgeClass(loz, goal);
+  const el   = document.getElementById('nic-lozenge-badge-wrap');
+  if(!el) return;
+  const diff = goal - loz;
+  const label = loz > goal  ? `${loz - goal} over goal · goal ${goal}` :
+                loz === goal ? `At goal · ${goal}/day` :
+                               `${diff} under goal · goal ${goal}`;
+  el.innerHTML = `<span class="badge ${cls}" style="font-size:10px">${label}</span>`;
+}
+
+function prefillNicZero() {
+  nicState = { lozenges:0, patchNight:false, patchDay:false };
+  const lv = document.getElementById('nic-lozenge-val'); if(lv) lv.textContent = '0';
+  const pn = document.getElementById('nic-patch-night'); if(pn) pn.checked = false;
+  const pd = document.getElementById('nic-patch-day');   if(pd) pd.checked = false;
+  updateNicBadge();
+  showToast('Pre-filled zero — tap Save to confirm');
+}
+
+function saveNic() {
+  nicState.patchNight = document.getElementById('nic-patch-night')?.checked || false;
+  nicState.patchDay   = document.getElementById('nic-patch-day')?.checked   || false;
+  const entry = { ...nicState, date:nicTargetDate(), savedAt:new Date().toISOString() };
+  S.setJSON('nic_' + nicTargetDate(), entry);
+  const chip = document.getElementById('nic-saved-chip');
+  if(chip){ chip.style.display='block'; setTimeout(()=>chip.style.display='none', 2500); }
+  showToast('Nicotine log saved ✓');
+  updateNicDateSub();
+  renderNicStreak();
+}
+
+function populateNicForm(dateStr) {
+  const ex = S.getJSON('nic_' + dateStr);
+  nicState = ex
+    ? { lozenges:ex.lozenges||0, patchNight:!!ex.patchNight, patchDay:!!ex.patchDay }
+    : { lozenges:0, patchNight:false, patchDay:false };
+  const lv = document.getElementById('nic-lozenge-val'); if(lv) lv.textContent = nicState.lozenges;
+  const pn = document.getElementById('nic-patch-night'); if(pn) pn.checked = nicState.patchNight;
+  const pd = document.getElementById('nic-patch-day');   if(pd) pd.checked = nicState.patchDay;
+  updateNicBadge();
+}
+
+function updateNicDateSub() {
+  const el = document.getElementById('nic-date-sub');
+  if(!el) return;
+  const target = nicTargetDate();
+  const saved  = !!S.getJSON('nic_' + target);
+  const d      = new Date(target+'T12:00:00');
+  const label  = nicDateOffset===0 ? 'Today' : nicDateOffset===1 ? 'Yesterday' : `${nicDateOffset} days ago`;
+  const ds     = d.toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});
+  el.textContent = saved ? `✓ ${label} · ${ds}` : `${label} · ${ds} · not yet logged`;
+  el.style.color = saved ? 'var(--green)' : 'var(--text3)';
+}
+
+function renderNicStreak() {
+  const streak = getNicStreak();
+  const today  = todayISO();
+  const goal   = getNicGoal(today);
+
+  const sv = document.getElementById('nic-streak-val');
+  if(sv) {
+    sv.textContent = streak;
+    sv.style.color = streak >= 7 ? 'var(--green)' : streak >= 3 ? 'var(--cardio)' : 'var(--text2)';
+  }
+  const gb = document.getElementById('nic-goal-badge');
+  if(gb) gb.innerHTML = makeBadge(`Goal: ${goal}/day`, 'badge-orange');
+  const pn = document.getElementById('nic-phase-note');
+  if(pn) pn.textContent = getNicPhaseLabel(today);
+}
+
+function renderNicPage() {
+  nicDateOffset = 0;
+  [0,1,2,3].forEach(i => {
+    const el = document.getElementById(i===0?'nic-date-today':`nic-date-${i}`);
+    if(el) el.className = 'tog-btn'+(i===0?' active act-blue':'');
+  });
+  populateNicForm(todayISO());
+  updateNicDateSub();
+  renderNicStreak();
 }
 
 // ══════════════════════════════════════════════════════════
