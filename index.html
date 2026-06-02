@@ -2748,11 +2748,14 @@ function noteKey(period) {
 function buildCoachingContext(data) {
   const row     = data?.todayRow || {};
   const snap    = data?.snap    || {};
-  const idx     = getCycleIdx();
-  const day     = DAYS[idx];
-  const bb      = currentBB;
-  const rule    = getBBRule(idx, bb);
-  const weekNum = getWeekNum();
+  const idx      = getCycleIdx();
+  const day      = DAYS[idx];
+  const bb       = currentBB;
+  const rule     = getBBRule(idx, bb);
+  const weekNum  = getWeekNum();
+  const tomorrowIdx = (idx + 1) % 6;
+  const tomorrow    = DAYS[tomorrowIdx];
+  const tomorrowRule = getBBRule(tomorrowIdx, bb);
 
   // Yesterday's lifestyle log
   const yLog = loadLifestyleLog(offsetISO(-1));
@@ -2835,7 +2838,8 @@ function buildCoachingContext(data) {
 Session recommendation: "${rule.opt}" — ${rule.desc}
 BB at wake: ${bbWake ?? '—'} (decision-making BB)${noWakeFlag} | BB current: ${bbCurrent ?? '—'} | HRV: ${row.hrv_ms||'—'}ms | Sleep: ${row.sleep_hrs||'—'} hrs, score ${row.sleep_score||'—'}/100
 Training readiness: ${snap.training_readiness||row.training_readiness||'—'} | Training status: ${snap.training_status||row.training_status||'—'} | VO₂: ${row.vo2_max||snap.vo2_max||'—'}
-Resting HR: ${snap.resting_hr||row.resting_hr||'—'} | Stress: ${snap.avg_stress||row.avg_stress||'—'}${shiftCtx}`,
+Resting HR: ${snap.resting_hr||row.resting_hr||'—'} | Stress: ${snap.avg_stress||row.avg_stress||'—'}${shiftCtx}
+TOMORROW: Cycle Day ${tomorrow.num} — ${tomorrow.name} (${tomorrow.badge}). Default recommendation: "${tomorrowRule.opt}".`,
     lifestyleCtx,
     todayCtx,
     yesterdayActivities: `Yesterday's Garmin activities: ${formatActs(yesterdayActs)}`,
