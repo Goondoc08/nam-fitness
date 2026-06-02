@@ -3063,7 +3063,21 @@ function renderTrends(data) {
   renderRunningLog();
 
   // ── Sparklines ─────────────────────────────────────────
-  const last7 = daily.filter(r=>r.date).sort((a,b)=>a.date.localeCompare(b.date)).slice(-7);
+  // Build last7 from daily log rows, then overlay today's snapshot sleep data
+  // since sleep lives in the snapshot until tomorrow's 6 AM full sync writes it to the daily row.
+  const snap = data?.snap || {};
+  const last7raw = daily.filter(r=>r.date).sort((a,b)=>a.date.localeCompare(b.date)).slice(-7);
+  const last7 = last7raw.map(r => {
+    if(r.date !== todayISO()) return r;
+    // Merge snapshot sleep fields onto today's row if the row is missing them
+    return {
+      ...r,
+      sleep_score: n(r.sleep_score) !== null ? r.sleep_score : (snap.sleep_score || r.sleep_score),
+      sleep_hrs:   n(r.sleep_hrs)   !== null ? r.sleep_hrs   : (snap.sleep_hrs   || r.sleep_hrs),
+      deep_min:    n(r.deep_min)    !== null ? r.deep_min    : (snap.deep_min    || r.deep_min),
+      rem_min:     n(r.rem_min)     !== null ? r.rem_min     : (snap.rem_min     || r.rem_min),
+    };
+  });
   const hrvVals   = last7.map(r=>n(r.hrv_ms)).filter(v=>v!==null);
   const sleepVals = last7.map(r=>n(r.sleep_score)).filter(v=>v!==null);
   const bbVals    = last7.map(r=>n(r.bb_wake)??n(r.bb_high)).filter(v=>v!==null);
