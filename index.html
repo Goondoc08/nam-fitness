@@ -1438,13 +1438,10 @@ async function loadAllSheetData() {
   let snap = null, activities = [];
   if(snapshot && snapshot.length) {
     snap = snapshot[0]; // row 2 — live metrics
-
-    // Activities start after a blank row (row index varies — find by activity_name header)
-    // The snapshot has a second "table" starting at row 4
-    // After parseSheet, these come through as additional rows
-    // We detect them by looking for rows where 'activity_name' or first key matches
-    const actRows = snapshot.filter((r,i) => i > 0 && r[Object.keys(r)[0]] && !r.last_updated);
-    activities = actRows.filter(r => Object.values(r).some(v => v && v.length > 0));
+    // Activities are now a JSON string in the activities_json column
+    if(snap.activities_json) {
+      try { activities = JSON.parse(snap.activities_json); } catch(e) { activities = []; }
+    }
   }
 
   // ── Daily Log ────────────────────────────────────
@@ -1568,15 +1565,20 @@ function renderMetrics(data) {
   if(activities.length) {
     const actCard = document.getElementById('activities-card');
     actCard.style.display = 'block';
-    document.getElementById('activities-list').innerHTML = activities.map(a => {
-      const name = a.activity_name || a[Object.keys(a)[0]] || '—';
-      const dur  = a.duration_min || '';
-      const hr   = a.avg_hr || '';
-      return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
-        <div style="font-size:14px;font-weight:600">${name}</div>
-        <div style="font-size:12px;color:var(--text3)">${dur?dur+' min':''}${hr?' · '+hr+' avg HR':''}</div>
+    document.getElementById('activities-list').innerHTML = activities.map((a, i) => {
+      const name  = a.activity_name || '—';
+      const chips = [];
+      if(a.duration_min) chips.push(`${a.duration_min} min`);
+      if(a.avg_hr)       chips.push(`${a.avg_hr} avg HR`);
+      if(a.calories)     chips.push(`${a.calories} kcal`);
+      if(a.distance_km)  chips.push(`${a.distance_km} km`);
+      if(a.extra)        chips.push(a.extra);
+      const isLast = i === activities.length - 1;
+      return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;${isLast?'':'border-bottom:1px solid var(--border)'}">
+        <div style="font-size:14px;font-weight:600;color:var(--text1)">${name}</div>
+        <div style="font-size:12px;color:var(--text3);text-align:right">${chips.join(' · ')}</div>
       </div>`;
-    }).join('').replace(/border-bottom[^"]*"([^<]*)(<\/div>\s*$)/,'$2');
+    }).join('');
   }
 }
 
