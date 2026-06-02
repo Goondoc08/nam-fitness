@@ -1334,10 +1334,14 @@ function todayMidnight() {
   const d = new Date();
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
-function todayISO() { return new Date().toISOString().slice(0,10); }
+function todayISO() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
 function offsetISO(days) {
-  const d = new Date(); d.setDate(d.getDate()+days);
-  return d.toISOString().slice(0,10);
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 function getCycleIdx() {
   const diff = Math.round((todayMidnight() - ANCHOR) / 86400000);
@@ -2495,14 +2499,34 @@ function setMeal(val) {
 function updateSessionLoggedStatus() {
   const el  = document.getElementById('session-logged-status');
   if(!el) return;
-  const log     = S.getJSON('session_log_' + logTargetDate());
+  const slog    = S.getJSON('session_log_' + logTargetDate());
   const stretch = getStretchLog(logTargetDate());
   const chips   = [];
-  if(log)     chips.push(`<span class="badge badge-green" style="font-size:10px">✓ ${log.dayName} logged${log.shifted?' · shifted':''}</span>`);
+  if(slog)    chips.push(`<span class="badge badge-green" style="font-size:10px">✓ ${slog.dayName} logged${slog.shifted?' · shifted':''}</span>`);
   if(stretch) chips.push(`<span class="badge badge-purple" style="font-size:10px">✓ Stretch</span>`);
-  el.innerHTML = chips.length
-    ? `<div style="display:flex;gap:6px;flex-wrap:wrap">${chips.join('')}</div>`
-    : `<span style="color:var(--text3)">No session logged for this date yet</span>`;
+  if(chips.length) {
+    const unlogParts = [];
+    if(slog)    unlogParts.push(`<button onclick="unlogSession()" style="background:none;border:1px solid var(--border2);color:var(--text3);border-radius:6px;padding:2px 8px;font-size:10px;cursor:pointer">✕ Unlog session</button>`);
+    if(stretch) unlogParts.push(`<button onclick="unlogStretch()" style="background:none;border:1px solid var(--border2);color:var(--text3);border-radius:6px;padding:2px 8px;font-size:10px;cursor:pointer">✕ Unlog stretch</button>`);
+    el.innerHTML = `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">${chips.join('')}${unlogParts.join('')}</div>`;
+  } else {
+    el.innerHTML = `<span style="color:var(--text3)">No session logged for this date yet</span>`;
+  }
+}
+
+function unlogSession() {
+  const date = logTargetDate();
+  S.del('session_log_' + date);
+  updateSessionLoggedStatus();
+  renderSessionPage();
+  showToast('Session unlogged for ' + date);
+}
+
+function unlogStretch() {
+  const date = logTargetDate();
+  S.del('stretch_log_' + date);
+  updateSessionLoggedStatus();
+  showToast('Stretch unlogged for ' + date);
 }
 
 function toggleAcuity(checked) {
@@ -2787,6 +2811,7 @@ function buildCoachingContext(data) {
     if(!acts.length) return 'None recorded.';
     return acts.map(a => {
       const parts = [a.activity_name];
+      if(a.bb_at_start != null && a.bb_at_start !== '') parts.push(`BB ${a.bb_at_start} at start`);
       if(a.duration_min) parts.push(`${a.duration_min} min`);
       if(a.avg_hr)       parts.push(`avg HR ${a.avg_hr}`);
       if(a.calories)     parts.push(`${a.calories} kcal`);
@@ -2871,7 +2896,7 @@ async function generateCoachingNote(forceRefresh = false) {
 
   const systemPrompt = isMorning
     ? `You are Nicholas's personal fitness coach. Write a warm, direct 2–3 sentence morning coaching note. His wake Body Battery is the primary decision signal for today's session — reference it specifically and tie it to the session recommendation. Mention at least one other metric (HRV, sleep, readiness). If a high-acuity work event was logged yesterday, one sentence max on that, then focus on today. No generic motivation — sound like a coach who's been following his journey for weeks.${isNoWake ? ' Note: wake BB was unavailable this morning — do not reference it as if it exists.' : ''}`
-    : `You are Nicholas's personal fitness coach. Write a warm, direct 2–3 sentence evening note reviewing how the day went. Reference what was actually logged today (session and any Garmin activities) — do not assume the scheduled session was done if a different one or none was logged. Use current Body Battery to calibrate tonight's recovery advice. Give one specific actionable recommendation for tonight or tomorrow morning. No generic motivation.`;
+    : `You are Nicholas's personal fitness coach. Write a warm, direct 2–3 sentence evening note reviewing how the day went. Reference what was actually logged today (session and any Garmin activities) — do not assume the scheduled session was done if a different one or none was logged. Each activity includes BB at start — use that to assess whether the session load was appropriate, not current end-of-day BB. BB at wake drove the session decision; BB at workout start reflects actual state during training; current BB reflects full-day drain and is only relevant for tonight's recovery advice. Give one specific actionable recommendation for tonight or tomorrow morning. No generic motivation.`;
 
   const userMsg = `${ctx.profile}
 
