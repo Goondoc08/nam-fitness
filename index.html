@@ -1282,12 +1282,14 @@ input:checked ~ .toggle-slider-orange::before{background:var(--orange);transform
 // ══════════════════════════════════════════════════════════
 //  CONSTANTS
 // ══════════════════════════════════════════════════════════
-const SHEET_ID_DEFAULT = '1MVwt__xhzeIOL1fCXWSb621VCLxIvd8dQMuem2cfJZA';
-const TAB_DAILY        = 'NAM Fitness — Garmin Daily Log';
-const TAB_SNAPSHOT     = 'NAM Fitness — Current Snapshot';
-const ANCHOR           = new Date(2026, 4, 24); // May 24 2026 — cycle anchor
-const BLOCK_START      = new Date(2026, 4, 12); // May 12 2026 — block start (week 1)
-const WEEK_TOTAL       = 12;
+const SHEET_ID_DEFAULT  = '1MVwt__xhzeIOL1fCXWSb621VCLxIvd8dQMuem2cfJZA';
+const TAB_DAILY         = 'NAM Fitness — Garmin Daily Log';
+const TAB_SNAPSHOT      = 'NAM Fitness — Current Snapshot';
+const TAB_ACTIVITIES    = 'NAM Fitness — Activity Log';
+const ANCHOR            = new Date(2026, 4, 24); // May 24 2026 — cycle anchor
+const BLOCK_START       = new Date(2026, 4, 12); // May 12 2026 — block start (week 1)
+const WEEK_TOTAL        = 12;
+const DAYCARE_START     = '2026-06-09'; // M/W/F 0830–1445 from this date forward
 
 const DAYS = [
   { num:1, name:'Lift A',          sub:'Squat Day',    type:'lift',     color:'var(--lift)',     badge:'On Shift',   shiftDay:true  },
@@ -1535,9 +1537,10 @@ async function fetchSheet(tabName) {
 }
 
 async function loadAllSheetData() {
-  const [daily, snapshot] = await Promise.all([
+  const [daily, snapshot, activityLog] = await Promise.all([
     fetchSheet(TAB_DAILY),
     fetchSheet(TAB_SNAPSHOT),
+    fetchSheet(TAB_ACTIVITIES),
   ]);
 
   // ── Current Snapshot ─────────────────────────────
@@ -1560,7 +1563,7 @@ async function loadAllSheetData() {
     todayRow = (exact && hasAnyData(exact)) ? exact : (allSorted.find(r => hasAnyData(r)) || null);
   }
 
-  return { snap, activities, todayRow, daily: daily || [] };
+  return { snap, activities, todayRow, daily: daily || [], activityLog: activityLog || [] };
 }
 
 // ══════════════════════════════════════════════════════════
@@ -2835,7 +2838,7 @@ function initLogTab() {
 // ══════════════════════════════════════════════════════════
 //  AI — COACHING NOTE
 // ══════════════════════════════════════════════════════════
-async function askClaude(system, userContent) {
+async function askClaude(system, userContent, maxTokens = 350) {
   const key = getAnthropicKey();
   if(!key) throw new Error('No Anthropic key configured');
   const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -2848,7 +2851,7 @@ async function askClaude(system, userContent) {
     },
     body: JSON.stringify({
       model:'claude-haiku-4-5-20251001',
-      max_tokens:350,
+      max_tokens: maxTokens,
       system,
       messages:[{role:'user',content:[{type:'text',text:userContent}]}]
     })
@@ -2860,7 +2863,7 @@ async function askClaude(system, userContent) {
 
 function notePeriod() {
   const h = new Date().getHours();
-  if(h >= 17) return 'evening';
+  if(h >= 20) return 'evening';
   if(h < 5)   return null; // overnight — no note yet
 
   const snap      = sheetDataGlobal?.snap || {};
@@ -2893,81 +2896,146 @@ function isMorningPeriod(period) {
 }
 
 function buildCoachingContext(data) {
-  const row     = data?.todayRow || {};
-  const snap    = data?.snap    || {};
-  const idx      = getCycleIdx();
-  const day      = DAYS[idx];
-  const bb       = currentBB;
-  const rule     = getBBRule(idx, bb);
-  const weekNum  = getWeekNum();
-  const tomorrowIdx = (idx + 1) % 6;
-  const tomorrow    = DAYS[tomorrowIdx];
+  const row  = data?.todayRow  || {};
+  const snap = data?.snap      || {};
+  const acts = data?.activityLog || [];
+  const idx  = getCycleIdx();
+  const day  = DAYS[idx];
+  const bb   = currentBB;
+  const weekNum      = getWeekNum();
+  const tomorrowIdx  = (idx + 1) % 6;
+  const tomorrow     = DAYS[tomorrowIdx];
   const tomorrowRule = getBBRule(tomorrowIdx, bb);
 
-  // Yesterday's lifestyle log
-  const yLog = loadLifestyleLog(offsetISO(-1));
-  let lifestyleCtx = 'No lifestyle log for yesterday.';
-  if(yLog) {
-    const parts = [];
-    const sessionLog = S.getJSON('session_log_' + offsetISO(-1));
-    if(sessionLog) parts.push(`Completed: ${sessionLog.dayName}${sessionLog.shifted?' (shifted day)':''}.`);
-    if(yLog.etoh > 0) parts.push(`${yLog.etoh} drink(s) — expect HRV/recovery impact.`);
-    if(yLog.caffeineTime && ['4-6','after-6'].includes(yLog.caffeineTime))
-      parts.push(`Late caffeine (${CAF_LABELS[yLog.caffeineTime]}) — may have disrupted sleep.`);
-    if(yLog.meals === 'offplan') parts.push('Off-plan meals yesterday.');
-    if(yLog.meals === 'clean')   parts.push('Clean eating yesterday.');
-    if(yLog.highAcuity) parts.push(`⚠️ High-acuity work event${yLog.acuityNote?' — "'+yLog.acuityNote+'"':''} — cortisol response likely still active.`);
-    if(yLog.sessionNote) parts.push(`Note: "${yLog.sessionNote}"`);
-    if(parts.length) lifestyleCtx = parts.join(' ');
+  // ── Shift position from cycle day ──────────────────────────
+  function getShiftPosition(cycleIdx) {
+    const d   = new Date();
+    const dow = d.getDay(); // 0=Sun … 6=Sat
+    const isMWF = [1,3,5].includes(dow);
+    const daycareAvail = todayISO() >= DAYCARE_START && isMWF;
+    switch(cycleIdx) {
+      case 0: return 'ON SHIFT — Day 1 of 2. Off at 0600 Day 3.';
+      case 1: return 'ON SHIFT — Day 2 of 2 (last day). Off at 0600 tomorrow. Wife starting her 48hr shift today.';
+      case 2: {
+        const dc = daycareAvail
+          ? 'Daycare today 0830–1445 — sleep window available after drop-off.'
+          : 'No daycare today — no automatic sleep window. Backup support available if needed.';
+        return `POST-SHIFT — Day 1 of 4 off. Got off at 0600. Solo parenting (wife on her shift until 0600 tomorrow). ${dc}`;
+      }
+      case 3: return 'OFF SHIFT — Day 2 of 4. Wife home (off her shift since 0600 today). Back on shift in 2 days.';
+      case 4: return 'OFF SHIFT — Day 3 of 4. Wife home. Back on shift in 2 days.';
+      case 5: return 'OFF SHIFT — Day 4 of 4 (last off day). Wife home. Back on shift tomorrow at 0600.';
+      default: return 'Off shift.';
+    }
   }
 
-  // Today's log (for evening note)
-  const todayLog = loadLifestyleLog(todayISO());
-  let todayCtx = 'Nothing logged today yet.';
-  if(todayLog) {
-    const parts = [];
-    const sessionLog = S.getJSON('session_log_' + todayISO());
-    if(sessionLog) parts.push(`Session logged: ${sessionLog.dayName}${sessionLog.shifted?' (shifted)':''}.`);
-    if(todayLog.etoh > 0) parts.push(`${todayLog.etoh} drink(s) today.`);
-    if(todayLog.caffeineTime) parts.push(`Caffeine last cup: ${CAF_LABELS[todayLog.caffeineTime]}.`);
-    if(todayLog.meals) parts.push(`Meals: ${todayLog.meals}.`);
-    if(todayLog.highAcuity) parts.push(`⚠️ High-acuity shift today.`);
-    if(todayLog.sessionNote) parts.push(`Note: "${todayLog.sessionNote}"`);
-    if(parts.length) todayCtx = parts.join(' ');
+  // ── Tomorrow shift context ──────────────────────────────────
+  function getTomorrowShiftNote(tomorrowIdx) {
+    const d    = new Date(); d.setDate(d.getDate() + 1);
+    const dow  = d.getDay();
+    const isMWF = [1,3,5].includes(dow);
+    const dcAvail = (() => { const s = new Date(d); s.setHours(0,0,0,0); const ds = `${s.getFullYear()}-${String(s.getMonth()+1).padStart(2,'0')}-${String(s.getDate()).padStart(2,'0')}`; return ds >= DAYCARE_START && isMWF; })();
+    switch(tomorrowIdx) {
+      case 0: return 'On shift from 0600. Wife home.';
+      case 1: return 'On shift Day 2. Wife starting her 48hr shift at 0600.';
+      case 2: {
+        const dc = dcAvail ? 'Daycare available 0830–1445 — sleep window after drop-off.' : 'No daycare — no automatic sleep window.';
+        return `Off shift at 0600 into solo parenting. ${dc} Wife home at 0600 Day 4.`;
+      }
+      case 3: return 'Off shift. Wife home (her shift ends at 0600).';
+      case 4: return 'Off shift. Wife home. Back on shift in 2 days.';
+      case 5: return 'Off shift — last off day. Back on shift at 0600 next day.';
+      default: return '';
+    }
   }
 
-  // Shift context — explain deliberate shift so coach doesn't misread it
+  // ── Deliberate session shift note ──────────────────────────
   const todaySessionLog = S.getJSON('session_log_' + todayISO());
-  let shiftCtx = '';
+  let sessionShiftNote = '';
   if(todaySessionLog?.shifted) {
     const scheduledDay = DAYS[idx];
-    const doneDay = DAYS[todaySessionLog.dayIdx];
-    shiftCtx = `\nSHIFT NOTE: Nicholas deliberately moved ${doneDay.name} (Cycle Day ${doneDay.num}) to today. Today's scheduled day was ${scheduledDay.name} (Day ${scheduledDay.num}). This is an intentional 48/96 scheduling decision — never treat it as a mistake or poor judgment.`;
+    const doneDay      = DAYS[todaySessionLog.dayIdx];
+    sessionShiftNote   = `NOTE: Nicholas deliberately moved ${doneDay.name} (Day ${doneDay.num}) to today instead of scheduled ${scheduledDay.name} (Day ${scheduledDay.num}) — intentional 48/96 scheduling, not an error.`;
   }
 
-  const bbWake    = parseFloat(snap.bb_wake) || parseFloat(row.bb_wake) || null;
+  // ── Metrics ────────────────────────────────────────────────
+  const bbWake    = parseFloat(snap.bb_wake)    || parseFloat(row.bb_wake)    || null;
   const bbCurrent = bb || parseFloat(snap.bb_current) || null;
-  const noWakeFlag  = !bbWake ? ' ⚠️ Wake BB unavailable — Garmin sync may not have captured wake event.' : '';
+  const hrv       = parseFloat(snap.hrv_ms)     || parseFloat(row.hrv_ms)     || null;
+  const sleepHrs  = parseFloat(snap.sleep_hrs)  || parseFloat(row.sleep_hrs)  || null;
+  const sleepScore= parseFloat(snap.sleep_score)|| parseFloat(row.sleep_score)|| null;
+  const deepMin   = parseFloat(snap.deep_min)   || parseFloat(row.deep_min)   || null;
+  const remMin    = parseFloat(snap.rem_min)    || parseFloat(row.rem_min)    || null;
+  const readiness = snap.training_readiness || row.training_readiness || '—';
+  const status    = snap.training_status    || row.training_status    || '—';
+  const vo2       = row.vo2_max || snap.vo2_max || '—';
+  const restHR    = snap.resting_hr || row.resting_hr || '—';
+  const stress    = snap.avg_stress || row.avg_stress  || '—';
 
-  // Sleep — prefer snapshot (populated by 7-8 AM) over daily row (often blank at 6 AM sync)
-  const sleepHrs   = parseFloat(snap.sleep_hrs)   || parseFloat(row.sleep_hrs)   || null;
-  const sleepScore = parseFloat(snap.sleep_score) || parseFloat(row.sleep_score) || null;
-  const deepMin    = parseFloat(snap.deep_min)    || parseFloat(row.deep_min)    || null;
-  const remMin     = parseFloat(snap.rem_min)     || parseFloat(row.rem_min)     || null;
-  const noSleepFlag = !sleepHrs ? ' ⚠️ Sleep data not yet available from Garmin.' : '';
+  const noWakeFlag  = !bbWake   ? ' ⚠️ Wake BB unavailable.' : '';
+  const noSleepFlag = !sleepHrs ? ' ⚠️ Sleep data not yet available.' : '';
 
-  // Parse activities from activities_json — yesterday's from daily row, today's from snapshot
-  function parseActJson(jsonStr) {
-    if(!jsonStr || jsonStr === '[]') return [];
-    try { return JSON.parse(jsonStr); } catch(e) { return []; }
+  // ── HRV 7-day trend from daily log ─────────────────────────
+  function getHRVTrend() {
+    const vals = [];
+    for(let i = 1; i <= 7; i++) {
+      const r = (data.daily || []).find(d => d.date === offsetISO(-i));
+      const v = parseFloat(r?.hrv_ms);
+      if(!isNaN(v) && v > 0) vals.push(v);
+    }
+    if(vals.length < 3) return null;
+    const avg   = vals.reduce((a,b)=>a+b,0) / vals.length;
+    const recent = vals.slice(0,3).reduce((a,b)=>a+b,0) / 3;
+    if(recent > avg + 1.5) return `trending up (7d avg ${Math.round(avg)}ms)`;
+    if(recent < avg - 1.5) return `trending down (7d avg ${Math.round(avg)}ms)`;
+    return `stable (7d avg ${Math.round(avg)}ms)`;
   }
-  const yesterdayActs = parseActJson(row.activities_json);
-  const todayActs     = parseActJson(snap.activities_json);
 
-  function formatActs(acts) {
-    if(!acts.length) return 'None recorded.';
-    return acts.map(a => {
-      const parts = [a.activity_name];
+  // ── 7-day lifestyle summary from localStorage ──────────────
+  function getWeeklySummary() {
+    let totalDrinks = 0, sleepEntries = [], sessionsLogged = 0, bbWakes = [];
+    for(let i = 1; i <= 7; i++) {
+      const dateStr = offsetISO(-i);
+      const log = loadLifestyleLog(dateStr);
+      const sLog = S.getJSON('session_log_' + dateStr);
+      if(log) {
+        totalDrinks += log.etoh || 0;
+        const dailyRow = (data.daily||[]).find(d => d.date === dateStr);
+        const slHrs = parseFloat(log.sleep_hrs) || parseFloat(dailyRow?.sleep_hrs);
+        if(slHrs) sleepEntries.push(slHrs);
+        const bw = parseFloat(dailyRow?.bb_wake);
+        if(!isNaN(bw) && bw > 0) bbWakes.push(bw);
+      }
+      if(sLog) sessionsLogged++;
+    }
+    const avgSleep = sleepEntries.length
+      ? (sleepEntries.reduce((a,b)=>a+b,0)/sleepEntries.length).toFixed(1)
+      : '—';
+    const avgBB = bbWakes.length
+      ? Math.round(bbWakes.reduce((a,b)=>a+b,0)/bbWakes.length)
+      : '—';
+    return `Last 7 days: ${sessionsLogged} sessions logged · ${totalDrinks} drinks total · avg sleep ${avgSleep}hrs · avg wake BB ${avgBB}`;
+  }
+
+  // ── Block adherence ────────────────────────────────────────
+  function getBlockAdherence() {
+    const today   = todayMidnight();
+    const daysDone = Math.round((today - BLOCK_START) / 86400000);
+    let logged = 0;
+    for(let i = 0; i <= daysDone; i++) {
+      if(S.getJSON('session_log_' + offsetISO(-i))) logged++;
+    }
+    return `${logged} of ${daysDone + 1} days with session logged this block`;
+  }
+
+  // ── Activities from Activity Log tab ──────────────────────
+  function getActsForDate(dateStr) {
+    return acts.filter(a => a.date === dateStr);
+  }
+  function formatActs(actsArr) {
+    if(!actsArr.length) return 'None recorded.';
+    return actsArr.map(a => {
+      const parts = [a.activity_name || a.raw_type || 'Activity'];
       if(a.bb_at_start != null && a.bb_at_start !== '') parts.push(`BB ${a.bb_at_start} at start`);
       if(a.duration_min) parts.push(`${a.duration_min} min`);
       if(a.avg_hr)       parts.push(`avg HR ${a.avg_hr}`);
@@ -2978,27 +3046,68 @@ function buildCoachingContext(data) {
     }).join('; ');
   }
 
-  // Pull actual logged lift weights from localStorage — fall back to defaults
+  // ── Today's lifestyle log ──────────────────────────────────
+  const todayLog = loadLifestyleLog(todayISO());
+  let todayCtx = 'Nothing logged today yet.';
+  if(todayLog || todaySessionLog) {
+    const parts = [];
+    if(todaySessionLog) parts.push(`Session logged: ${todaySessionLog.dayName}${todaySessionLog.shifted?' (shifted)':''}.`);
+    if(todayLog?.etoh > 0) parts.push(`${todayLog.etoh} drink(s).`);
+    if(todayLog?.caffeineTime) parts.push(`Caffeine last cup: ${CAF_LABELS[todayLog.caffeineTime]}.`);
+    if(todayLog?.meals) parts.push(`Meals: ${todayLog.meals}.`);
+    if(todayLog?.highAcuity) parts.push(`⚠️ High-acuity shift${todayLog.acuityNote?' — "'+todayLog.acuityNote+'"':''}.`);
+    if(todayLog?.sessionNote) parts.push(`Note: "${todayLog.sessionNote}"`);
+    if(parts.length) todayCtx = parts.join(' ');
+  }
+
+  // ── Yesterday's lifestyle log ──────────────────────────────
+  const yLog    = loadLifestyleLog(offsetISO(-1));
+  const ySession = S.getJSON('session_log_' + offsetISO(-1));
+  let yCtx = 'No lifestyle log for yesterday.';
+  if(yLog || ySession) {
+    const parts = [];
+    if(ySession) parts.push(`Completed: ${ySession.dayName}${ySession.shifted?' (shifted)':''}.`);
+    if(yLog?.etoh > 0) parts.push(`${yLog.etoh} drink(s).`);
+    if(yLog?.caffeineTime && ['4-6','after-6'].includes(yLog.caffeineTime))
+      parts.push(`Late caffeine (${CAF_LABELS[yLog.caffeineTime]}).`);
+    if(yLog?.meals === 'offplan') parts.push('Off-plan meals.');
+    if(yLog?.highAcuity) parts.push(`⚠️ High-acuity shift${yLog.acuityNote?' — "'+yLog.acuityNote+'"':''}.`);
+    if(parts.length) yCtx = parts.join(' ');
+  }
+
+  // ── Lift weights ───────────────────────────────────────────
   function liftWeightStr(session) {
     const logs = recentLifts(session, 1);
-    const last  = logs[0]?.weights;
-    const defs  = LIFT_DEFS[session];
+    const last = logs[0]?.weights;
+    const defs = LIFT_DEFS[session];
     return defs.map(d => `${d.name} ${last?.[d.key] ?? d.default}`).join(' / ') + ' lbs';
   }
 
+  const rule        = getBBRule(idx, bb);
+  const hrvTrend    = getHRVTrend();
+  const weeklySummary = getWeeklySummary();
+  const blockAdh    = getBlockAdherence();
+
   return {
-    profile:`Nicholas: 39yo firefighter, Pearland TX, 48/96 shift schedule. ~235 lbs, down ~60 lbs. Recomping — building muscle while losing fat. Chronic sleep deficit ~2h20min nightly for 12+ months. HRV baseline 27–30ms (33ms+ = strong, under 25ms = flag). Body Battery rarely exceeds 65. No overhead pressing ever — old shoulder injury, floor press is the permanent substitute.`,
-    today:`Week ${weekNum} of 12. Cycle Day ${day.num} — ${day.name} (${day.badge}).
-Session recommendation: "${rule.opt}" — ${rule.desc}
-BB at wake: ${bbWake ?? '—'} (decision-making BB)${noWakeFlag} | BB current: ${bbCurrent ?? '—'} | HRV: ${row.hrv_ms||'—'}ms | Sleep: ${sleepHrs ?? '—'} hrs, score ${sleepScore ?? '—'}/100, deep ${deepMin ?? '—'} min, REM ${remMin ?? '—'} min${noSleepFlag}
-Training readiness: ${snap.training_readiness||row.training_readiness||'—'} | Training status: ${snap.training_status||row.training_status||'—'} | VO₂: ${row.vo2_max||snap.vo2_max||'—'}
-Resting HR: ${snap.resting_hr||row.resting_hr||'—'} | Stress: ${snap.avg_stress||row.avg_stress||'—'}${shiftCtx}
-TOMORROW: Cycle Day ${tomorrow.num} — ${tomorrow.name} (${tomorrow.badge}). Default recommendation: "${tomorrowRule.opt}".`,
-    lifestyleCtx,
-    todayCtx,
-    yesterdayActivities: `Yesterday's Garmin activities: ${formatActs(yesterdayActs)}`,
-    todayActivities:     `Today's Garmin activities so far: ${formatActs(todayActs)}`,
-    liftWeights:`Lift A current weights: ${liftWeightStr('liftA')}. Lift B: ${liftWeightStr('liftB')}.`
+    profile: `Nicholas — 39yo firefighter, Pearland TX, 48/96 shift. ~235 lbs, down ~60 lbs. Recomping. Chronic sleep deficit ~2h20min for 12+ months. HRV baseline 27–30ms (33ms+ strong, under 25ms flag). BB rarely exceeds 65. No overhead pressing — floor press is the permanent substitute. Wife also firefighter on 48/96 starting day after Nicholas — always on shift Nicholas's Cycle Day 3, home from Day 4 morning. Solo parenting Cycle Day 3. Kids in daycare M/W/F 0830–1445. Backup support occasionally available.`,
+
+    metrics: `Week ${weekNum} of 12. ${blockAdh}.
+Cycle Day ${day.num} — ${day.name}. ${getShiftPosition(idx)}
+BB wake: ${bbWake ?? '—'}${noWakeFlag} | BB current: ${bbCurrent ?? '—'} | HRV: ${hrv ?? '—'}ms${hrvTrend ? ' ('+hrvTrend+')' : ''}
+Sleep: ${sleepHrs ?? '—'} hrs · score ${sleepScore ?? '—'}/100 · deep ${deepMin ?? '—'} min · REM ${remMin ?? '—'} min${noSleepFlag}
+Readiness: ${readiness} | Status: ${status} | VO₂: ${vo2} | Resting HR: ${restHR} | Stress: ${stress}
+${weeklySummary}`,
+
+    sessionCtx: `Today's session recommendation: "${rule.opt}" — ${rule.desc}${sessionShiftNote ? '\n'+sessionShiftNote : ''}`,
+
+    tomorrow: `TOMORROW: Cycle Day ${tomorrow.num} — ${tomorrow.name}. ${getTomorrowShiftNote(tomorrowIdx)}
+Recommendation: "${tomorrowRule.opt}" — ${tomorrowRule.desc}`,
+
+    todayLog:      todayCtx,
+    yesterdayLog:  yCtx,
+    todayActs:     `Today's activities: ${formatActs(getActsForDate(todayISO()))}`,
+    yesterdayActs: `Yesterday's activities: ${formatActs(getActsForDate(offsetISO(-1)))}`,
+    liftWeights:   `Lift A: ${liftWeightStr('liftA')}. Lift B: ${liftWeightStr('liftB')}.`,
   };
 }
 
@@ -3050,25 +3159,29 @@ async function generateCoachingNote(forceRefresh = false) {
   const isMorning = isMorningPeriod(period);
 
   const systemPrompt = isMorning
-    ? `You are Nicholas's personal fitness coach. Write a warm, direct 2–3 sentence morning coaching note. His wake Body Battery is the primary decision signal for today's session — reference it specifically and tie it to the session recommendation. Mention at least one other metric (HRV, sleep, readiness). If a high-acuity work event was logged yesterday, one sentence max on that, then focus on today. No generic motivation — sound like a coach who's been following his journey for weeks.${isNoWake ? ' Wake BB was unavailable — do not reference it as if it exists, use readiness/HRV/sleep instead.' : ''}${isNoSleep ? ' Sleep data was unavailable — do not reference sleep score or hours as if they exist.' : ''}`
-    : `You are Nicholas's personal fitness coach. Write a warm, direct 2–3 sentence evening note reviewing how the day went. Reference what was actually logged today (session and any Garmin activities) — do not assume the scheduled session was done if a different one or none was logged. Each activity includes BB at start — use that to assess whether the session load was appropriate, not current end-of-day BB. BB at wake drove the session decision; BB at workout start reflects actual state during training; current BB reflects full-day drain and is only relevant for tonight's recovery advice. Give one specific actionable recommendation for tonight or tomorrow morning. No generic motivation.`;
+    ? `You are Nicholas's personal fitness coach. Write a direct 3–4 sentence morning note. Lead with last night's sleep — score, hours, and whether deep/REM were strong or weak, and what that means for today. Then give wake BB and HRV with a one-line read on recovery state. Follow with today's specific session recommendation including the BB-scaled option and any key numbers (zone, reps, distance). Close with one habit or goal nudge tied to the data. Reference shift status and tomorrow's context if relevant. No generic motivation — sound like a coach who has been tracking this for weeks.${isNoWake ? ' Wake BB unavailable — use readiness and HRV instead, do not reference wake BB as if it exists.' : ''}${isNoSleep ? ' Sleep data unavailable — do not reference sleep score or hours as if they exist.' : ''}`
+    : `You are Nicholas's personal fitness coach. Write a direct 4 sentence evening note. Sentence 1: assess today's activity using BB at start and HR data — was the load appropriate given his state. Sentence 2: flag the main recovery risk for tonight (alcohol, stress, late caffeine, low BB) and what it means for tomorrow's metrics. Sentence 3: give tomorrow's session recommendation with the specific BB threshold that determines which option to take. Sentence 4: one concrete sleep or recovery action for tonight, using shift context and home situation. Use the actual data — do not be vague. No generic motivation.`;
 
   const userMsg = `${ctx.profile}
 
-TODAY: ${ctx.today}
+METRICS: ${ctx.metrics}
 
-YESTERDAY'S LOG: ${ctx.lifestyleCtx}
-${ctx.yesterdayActivities}
+SESSION: ${ctx.sessionCtx}
 
-TODAY'S LOG: ${ctx.todayCtx}
-${ctx.todayActivities}
+${ctx.tomorrow}
+
+YESTERDAY: ${ctx.yesterdayLog}
+${ctx.yesterdayActs}
+
+TODAY: ${ctx.todayLog}
+${ctx.todayActs}
 
 ${ctx.liftWeights}
 
-KEY PRINCIPLE: Body Battery over schedule. Sleep over training. Longevity is the goal.`;
+PRINCIPLE: Body Battery over schedule. Sleep over training. Longevity is the goal.`;
 
   try {
-    const text = await askClaude(systemPrompt, userMsg);
+    const text = await askClaude(systemPrompt, userMsg, isMorning ? 350 : 450);
     S.setJSON(key, {text, generatedAt: new Date().toISOString(), period});
     renderCoachingNote(text, new Date().toISOString(), isMorning ? 'morning' : period, false);
   } catch(e) {
