@@ -3554,11 +3554,11 @@ function getNicStreak() {
 
 function getNicPhaseLabel(dateStr) {
   const goal = getNicGoal(dateStr);
-  if(goal === 0)  return 'Phase 5 · Dec 2026 · Target: 0/day';
-  if(goal === 3)  return 'Phase 4 · Nov 2026 · Target: 3/day';
-  if(goal === 5)  return 'Phase 3 · Oct 2026 · Target: 5/day';
-  if(goal === 15) return 'Phase 2 · Aug–Sep 2026 · Target: 15/day';
-  return 'Phase 1 · Jun–Jul 2026 · Target: 24/day';
+  if(goal === 0)  return 'Phase 5 · Dec 2026 · 0 lozenges · No patch';
+  if(goal === 3)  return 'Phase 4 · Nov 2026 · 3 lozenges · 7mg patch';
+  if(goal === 5)  return 'Phase 3 · Oct 2026 · 5 lozenges · 7mg patch';
+  if(goal === 15) return 'Phase 2 · Aug–Sep 2026 · 15 lozenges · 14mg patch';
+  return 'Phase 1 · Jun–Jul 2026 · 24 lozenges · 21mg patch';
 }
 
 function switchNicDate(offset) {
