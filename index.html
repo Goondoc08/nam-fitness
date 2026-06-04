@@ -1288,6 +1288,7 @@ const TAB_SNAPSHOT      = 'NAM Fitness — Current Snapshot';
 const TAB_ACTIVITIES    = 'NAM Fitness — Activity Log';
 const ANCHOR            = new Date(2026, 4, 24); // May 24 2026 — cycle anchor
 const BLOCK_START       = new Date(2026, 4, 12); // May 12 2026 — block start (week 1)
+const TRACKING_START    = new Date(2026, 4, 31); // May 31 2026 — first day of active app use
 const WEEK_TOTAL        = 12;
 const DAYCARE_START     = '2026-06-09'; // M/W/F 0830–1445 from this date forward
 
@@ -3022,13 +3023,14 @@ function buildCoachingContext(data) {
 
   // ── Block adherence ────────────────────────────────────────
   function getBlockAdherence() {
-    const today   = todayMidnight();
-    const daysDone = Math.round((today - BLOCK_START) / 86400000);
+    const today      = todayMidnight();
+    const trackStart = Math.max(BLOCK_START.getTime(), TRACKING_START.getTime());
+    const daysDone   = Math.round((today - trackStart) / 86400000);
     let logged = 0;
     for(let i = 0; i <= daysDone; i++) {
       if(S.getJSON('session_log_' + offsetISO(-i))) logged++;
     }
-    return `${logged} of ${daysDone + 1} days with session logged this block`;
+    return `${logged} of ${daysDone + 1} days with session logged since tracking started`;
   }
 
   // ── Activities from Activity Log tab ──────────────────────
@@ -3162,8 +3164,8 @@ async function generateCoachingNote(forceRefresh = false) {
   const isMorning = isMorningPeriod(period);
 
   const systemPrompt = isMorning
-    ? `You are Nicholas's personal fitness coach. Write a direct 3–4 sentence morning note. Lead with last night's sleep — score, hours, and whether deep/REM were strong or weak, and what that means for today. Then give wake BB and HRV with a one-line read on recovery state. Follow with today's specific session recommendation including the BB-scaled option and any key numbers (zone, reps, distance). Close with one habit or goal nudge tied to the data. Reference shift status and tomorrow's context if relevant. No generic motivation — sound like a coach who has been tracking this for weeks.${isNoWake ? ' Wake BB unavailable — use readiness and HRV instead, do not reference wake BB as if it exists.' : ''}${isNoSleep ? ' Sleep data unavailable — do not reference sleep score or hours as if they exist.' : ''}`
-    : `You are Nicholas's personal fitness coach. Write a direct 4 sentence evening note. Sentence 1: assess today's activity using BB at start and HR data — was the load appropriate given his state. Sentence 2: flag the main recovery risk for tonight (alcohol, stress, late caffeine, low BB) and what it means for tomorrow's metrics. Sentence 3: give tomorrow's session recommendation with the specific BB threshold that determines which option to take. Sentence 4: one concrete sleep or recovery action for tonight, using shift context and home situation. Use the actual data — do not be vague. No generic motivation.`;
+    ? `You are Nicholas's personal fitness coach — you know him well. He's 39, a firefighter, down 60 lbs and recomping, carrying a chronic sleep deficit of ~2h20min that has been going on for 12+ months. His HRV baseline is 27–30ms; 33ms+ is a strong day, under 25ms is a flag. His BB rarely exceeds 65 — treat 45+ as decent, 55+ as strong, under 35 as a hard skip trigger. Write a direct, personal 3–4 sentence morning note. Lead with sleep quality: score, hours, deep and REM minutes — tell him what they mean for today's capacity, not just what they are (e.g. low deep = muscular recovery compromised; low REM = cognitive/mood impact). Then give BB and HRV in one sentence with a direct read on whether he's primed to push or needs to manage load. Follow with today's specific session — name the BB-scaled option with the actual threshold, and if it's a lift day name the target weights for the exercises. Close with one sharp, non-generic action tied to the data — shift context, tomorrow's demands, or a specific recovery lever he can pull today. No motivational filler. Write like you've been coaching him for months.${isNoWake ? ' Wake BB unavailable — use readiness and HRV to assess recovery instead; do not reference wake BB as if it exists.' : ''}${isNoSleep ? ' Sleep data unavailable — do not reference sleep score or hours as if they exist.' : ''}`
+    : `You are Nicholas's personal fitness coach — you know him and his life. He's a firefighter on a 48/96 rotation with a wife on the same schedule, young kids, family obligations, and a real life outside training. Missed or skipped sessions happen for legitimate reasons — manual labor, family projects, shift demands, life. Never open with judgment. If a session was skipped or nothing is logged, assume there was a good reason and treat unlogged physical work (yard work, manual labor, helping family) as real exertion. Keep your total response under 400 tokens. Write 4 sentences: (1) Assess today — if a session was done, acknowledge it and note whether the load fit his state; if skipped or unlogged, acknowledge what he likely did instead and frame it as valid recovery context, not failure. (2) Name the single biggest recovery factor for tonight based on the actual data — BB level, alcohol, stress, or sleep debt — and state specifically what it means for tomorrow's numbers, not generically. (3) Give tomorrow's session and the BB threshold that determines full vs. modified option; if today's scheduled session was skipped, note whether it can be shifted to tomorrow or another open slot this cycle. (4) One concrete recovery action for tonight tied to his shift status and home situation. If block adherence is under 60% logged, add one sentence — calm, not critical — identifying the highest-priority session left in the cycle and the best window to fit it. Tone: encouraging, data-grounded, like a coach who knows his life isn't just training.`;
 
   const userMsg = `${ctx.profile}
 
@@ -3184,7 +3186,7 @@ ${ctx.liftWeights}
 PRINCIPLE: Body Battery over schedule. Sleep over training. Longevity is the goal.`;
 
   try {
-    const text = await askClaude(systemPrompt, userMsg, isMorning ? 350 : 450);
+    const text = await askClaude(systemPrompt, userMsg, isMorning ? 350 : 400);
     S.setJSON(key, {text, generatedAt: new Date().toISOString(), period});
     renderCoachingNote(text, new Date().toISOString(), isMorning ? 'morning' : period, false);
   } catch(e) {
@@ -3245,16 +3247,17 @@ function renderTrends(data) {
   const today = todayMidnight();
 
   // ── Block adherence ────────────────────────────────────
-  const blockDiff  = Math.round((today - BLOCK_START) / 86400000);
-  const blockDay   = blockDiff + 1;
-  const weekNum    = getWeekNum();
+  const blockDiff    = Math.round((today - BLOCK_START) / 86400000);
+  const trackDiff    = Math.round((today - Math.max(BLOCK_START.getTime(), TRACKING_START.getTime())) / 86400000);
+  const blockDay     = blockDiff + 1;
+  const weekNum      = getWeekNum();
   document.getElementById('trends-sub').textContent  = `Week ${weekNum} of ${WEEK_TOTAL}`;
   document.getElementById('adh-week').textContent    = `Week ${weekNum} of ${WEEK_TOTAL}`;
   document.getElementById('adh-day-count').textContent = `Day ${blockDay} of ${WEEK_TOTAL * 6}`;
 
-  // Count logged sessions from localStorage
+  // Count logged sessions from tracking start (not block start)
   let sessionCount = 0;
-  for(let i=0; i<blockDiff+1; i++) {
+  for(let i=0; i<trackDiff+1; i++) {
     if(S.getJSON('session_log_' + offsetISO(-i))) sessionCount++;
   }
   document.getElementById('adh-sessions').textContent = sessionCount;
