@@ -2918,17 +2918,17 @@ function buildCoachingContext(data) {
     const isMWF = [1,3,5].includes(dow);
     const daycareAvail = todayISO() >= DAYCARE_START && isMWF;
     switch(cycleIdx) {
-      case 0: return 'ON SHIFT — Day 1 of 2. Off at 0600 Day 3.';
-      case 1: return 'ON SHIFT — Day 2 of 2 (last day). Off at 0600 tomorrow. Wife starting her 48hr shift today.';
+      case 0: return 'ON SHIFT — Day 1 of 2. At station until 0600 Day 3. Up at 0450, shift starts 0600 — no pre-shift morning workout (not waking up at 0330). Station workouts are available during shift. No alcohol on shift.';
+      case 1: return 'ON SHIFT — Day 2 of 2. At station until 0600 tomorrow. Wife started her 48hr shift today — kids covered externally, not relevant to note. Station workouts available during shift. No alcohol on shift.';
       case 2: {
         const dc = daycareAvail
           ? 'Daycare today 0830–1445 — sleep window available after drop-off.'
-          : 'No daycare today — no automatic sleep window. Backup support available if needed.';
-        return `POST-SHIFT — Day 1 of 4 off. Got off at 0600. Solo parenting (wife on her shift until 0600 tomorrow). ${dc}`;
+          : 'No daycare today — no automatic sleep window.';
+        return `POST-SHIFT — Off at 0600. Likely swam at city natatorium on the way home (~85-90% chance, depends on childcare timing — not guaranteed). Solo parenting rest of day (wife still on her shift, home tomorrow ~0830-0900). ${dc}`;
       }
-      case 3: return 'OFF SHIFT — Day 2 of 4. Wife home (off her shift since 0600 today). Back on shift in 2 days.';
-      case 4: return 'OFF SHIFT — Day 3 of 4. Wife home. Back on shift in 2 days.';
-      case 5: return 'OFF SHIFT — Day 4 of 4 (last off day). Wife home. Back on shift tomorrow at 0600.';
+      case 3: return 'OFF SHIFT — Whole family home. Wife got home ~0830-0900 this morning (off her shift). No work today.';
+      case 4: return 'OFF SHIFT — Whole family home. No work.';
+      case 5: return 'OFF SHIFT — Last day before shift. Whole family home. Back on shift tomorrow at 0600.';
       default: return 'Off shift.';
     }
   }
@@ -2940,15 +2940,15 @@ function buildCoachingContext(data) {
     const isMWF = [1,3,5].includes(dow);
     const dcAvail = (() => { const s = new Date(d); s.setHours(0,0,0,0); const ds = `${s.getFullYear()}-${String(s.getMonth()+1).padStart(2,'0')}-${String(s.getDate()).padStart(2,'0')}`; return ds >= DAYCARE_START && isMWF; })();
     switch(tomorrowIdx) {
-      case 0: return 'On shift from 0600. Wife home.';
-      case 1: return 'On shift Day 2. Wife starting her 48hr shift at 0600.';
+      case 0: return 'On shift from 0600 — up at 0450, no pre-shift morning workout. Station workouts available during shift. No alcohol.';
+      case 1: return 'On shift Day 2. Wife starting her 48hr shift at 0600 — kids covered externally. Station workouts available. No alcohol.';
       case 2: {
         const dc = dcAvail ? 'Daycare available 0830–1445 — sleep window after drop-off.' : 'No daycare — no automatic sleep window.';
-        return `Off shift at 0600 into solo parenting. ${dc} Wife home at 0600 Day 4.`;
+        return `Off shift at 0600 — likely swim at city natatorium on the way home (~85-90% chance, childcare-dependent). Solo parenting rest of day. Wife home next morning ~0830-0900. ${dc}`;
       }
-      case 3: return 'Off shift. Wife home (her shift ends at 0600).';
-      case 4: return 'Off shift. Wife home. Back on shift in 2 days.';
-      case 5: return 'Off shift — last off day. Back on shift at 0600 next day.';
+      case 3: return 'Off shift. Wife home ~0830-0900 (her shift ends). Whole family home.';
+      case 4: return 'Off shift. Whole family home.';
+      case 5: return 'Off shift — last day before shift. Back on shift at 0600 next day. Whole family home.';
       default: return '';
     }
   }
