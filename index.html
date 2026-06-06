@@ -2919,7 +2919,7 @@ function buildCoachingContext(data) {
     const daycareAvail = todayISO() >= DAYCARE_START && isMWF;
     switch(cycleIdx) {
       case 0: return 'ON SHIFT — Day 1 of 2. At station until 0600 Day 3. Up at 0450, shift starts 0600 — no pre-shift morning workout (not waking up at 0330). Station workouts are available during shift. No alcohol on shift.';
-      case 1: return 'ON SHIFT — Day 2 of 2. At station until 0600 tomorrow. Wife started her 48hr shift today — kids covered externally, not relevant to note. Station workouts available during shift. No alcohol on shift.';
+      case 1: return 'ON SHIFT — Day 2 of 2. Already at station — no commute. Natural wake 0730-0800 if no overnight calls. Station workouts available. Station dinner typically 1800-1900; lights out ~2100-2200 when calls allow. Off at 0600 tomorrow. Wife started her 48hr shift today — kids covered externally. No alcohol on shift.';
       case 2: {
         const dc = daycareAvail
           ? 'Daycare today 0830–1445 — sleep window available after drop-off.'
@@ -2941,7 +2941,7 @@ function buildCoachingContext(data) {
     const dcAvail = (() => { const s = new Date(d); s.setHours(0,0,0,0); const ds = `${s.getFullYear()}-${String(s.getMonth()+1).padStart(2,'0')}-${String(s.getDate()).padStart(2,'0')}`; return ds >= DAYCARE_START && isMWF; })();
     switch(tomorrowIdx) {
       case 0: return 'On shift from 0600 — up at 0450, no pre-shift morning workout. Station workouts available during shift. No alcohol.';
-      case 1: return 'On shift Day 2. Wife starting her 48hr shift at 0600 — kids covered externally. Station workouts available. No alcohol.';
+      case 1: return 'On shift Day 2 — already at station, natural wake 0730-0800 if no overnight calls. Station dinner ~1800-1900, lights out ~2100-2200 when calls allow. Wife starting her 48hr shift at 0600 — kids covered externally. Station workouts available. No alcohol.';
       case 2: {
         const dc = dcAvail ? 'Daycare available 0830–1445 — sleep window after drop-off.' : 'No daycare — no automatic sleep window.';
         return `Off shift at 0600 — likely swim at city natatorium on the way home (~85-90% chance, childcare-dependent). Solo parenting rest of day. Wife home next morning ~0830-0900. ${dc}`;
