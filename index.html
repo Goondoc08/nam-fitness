@@ -1132,6 +1132,17 @@ input:checked ~ .toggle-slider-orange::before{background:var(--orange);transform
       </div>
 
       <button class="btn btn-green" onclick="saveSettings()">Save Settings</button>
+
+      <div class="form-divider"></div>
+
+      <div class="form-group">
+        <label class="form-label">Coach's Note</label>
+        <div class="form-hint" style="margin-bottom:10px">Regenerate once per period if data was stale or missing — locked after use</div>
+        <div style="display:flex;gap:8px">
+          <button id="regen-morning-btn" class="btn" style="flex:1;font-size:13px" onclick="regenCoachingNote('morning')">↻ Morning Note</button>
+          <button id="regen-evening-btn" class="btn" style="flex:1;font-size:13px" onclick="regenCoachingNote('evening')">↻ Evening Note</button>
+        </div>
+      </div>
       <div style="height:12px"></div>
       <button class="btn" onclick="exportData()" style="width:100%;font-size:13px;background:rgba(0,229,255,.12);color:var(--swim);border:1px solid rgba(0,229,255,.25)">📤 Export Data for Analysis</button>
       <div style="font-size:11px;color:var(--text3);margin-top:6px;margin-bottom:12px">Downloads a JSON file with all your logs — upload to Claude for deeper insights</div>
@@ -1375,6 +1386,43 @@ function updateKeyDots() {
 // ══════════════════════════════════════════════════════════
 //  SETTINGS
 // ══════════════════════════════════════════════════════════
+function regenCoachingNote(period) {
+  const usedKey = `nam_regen_used_${period}_${todayISO()}`;
+  if(S.get(usedKey)) {
+    showToast(`${period === 'morning' ? 'Morning' : 'Evening'} note already regenerated today`);
+    return;
+  }
+  // Clear cached note so generateCoachingNote will call the API fresh
+  const noteKey = `nam_coaching_${period}_${todayISO()}`;
+  S.del(noteKey);
+  // Mark used — can't regenerate again today
+  S.set(usedKey, '1');
+  // Update button states
+  updateRegenButtons();
+  closeSettings();
+  // Switch to Today tab and regenerate
+  showPage('today');
+  generateCoachingNote(true);
+  showToast(`Regenerating ${period} note…`);
+}
+
+function updateRegenButtons() {
+  const mBtn = document.getElementById('regen-morning-btn');
+  const eBtn = document.getElementById('regen-evening-btn');
+  const mUsed = !!S.get(`nam_regen_used_morning_${todayISO()}`);
+  const eUsed = !!S.get(`nam_regen_used_evening_${todayISO()}`);
+  if(mBtn) {
+    mBtn.disabled = mUsed;
+    mBtn.style.opacity = mUsed ? '0.4' : '1';
+    mBtn.textContent = mUsed ? '✓ Morning regenerated' : '↻ Morning Note';
+  }
+  if(eBtn) {
+    eBtn.disabled = eUsed;
+    eBtn.style.opacity = eUsed ? '0.4' : '1';
+    eBtn.textContent = eUsed ? '✓ Evening regenerated' : '↻ Evening Note';
+  }
+}
+
 function openSettings() {
   // Pre-fill
   const ak = getAnthropicKey(), sk = getSheetsKey();
@@ -1386,6 +1434,7 @@ function openSettings() {
   const ig = S.get('intensity_goal');
   if(ig) document.getElementById('s-intensity-goal').value = ig;
   updateKeyDots();
+  updateRegenButtons();
   document.getElementById('settings-overlay').classList.add('open');
   document.body.style.overflow = 'hidden';
 }
