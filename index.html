@@ -461,43 +461,40 @@ body{
 }
 
 /* ── On Demand cards ─────────────────────────────────────── */
-.od-card{
-  background:var(--card);border:1px solid var(--border);
-  border-radius:var(--radius);padding:14px 16px;margin-bottom:12px;
+.od-row{
+  display:flex;align-items:center;gap:14px;
+  padding:13px 16px;border-bottom:1px solid var(--border);
+  cursor:pointer;transition:opacity .15s;
 }
-.od-card-header{
-  display:flex;align-items:center;gap:10px;margin-bottom:12px;
-}
-.od-card-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
-.od-card-name{font-size:15px;font-weight:700}
+.od-row:last-child{border-bottom:none}
+.od-row:active{opacity:.7}
+.od-row-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.od-row-info{flex:1}
+.od-row-name{font-size:15px;font-weight:700}
+.od-row-meta{font-size:12px;color:var(--text3);margin-top:2px}
+.od-expand{padding:12px 16px 16px;border-top:1px solid var(--border)}
 .od-tier{
-  border-radius:10px;padding:10px 12px;margin-bottom:8px;
+  border-radius:10px;padding:10px 12px;margin-top:10px;
   border:1px solid var(--border);background:rgba(255,255,255,.03);
-  transition:background .15s;
-}
-.od-tier.od-active{
-  border-color:currentColor;background:var(--tint-color);
 }
 .od-tier-top{display:flex;align-items:center;gap:8px;margin-bottom:4px}
 .od-tier-badge{
   font-size:9px;font-weight:700;padding:2px 7px;
   border-radius:99px;background:rgba(255,255,255,.08);color:var(--text2);
-  white-space:nowrap;
+  white-space:nowrap;flex-shrink:0;
 }
-.od-tier.od-active .od-tier-badge{background:currentColor;color:#0D0F14}
-.od-tier-name{font-size:13px;font-weight:700}
+.od-tier-name{font-size:13px;font-weight:700;color:var(--text)}
 .od-tier-duration{font-size:11px;color:var(--text3);margin-left:auto}
 .od-tier-desc{font-size:12px;color:var(--text2);line-height:1.5;margin-top:4px}
 .od-note{
   font-size:11px;color:var(--text3);line-height:1.5;
-  padding-top:10px;border-top:1px solid var(--border);margin-top:4px;
+  padding-top:10px;border-top:1px solid var(--border);margin-top:10px;
 }
 .od-log-row{display:flex;align-items:center;justify-content:space-between;margin-top:12px}
 .od-logged-label{font-size:12px;color:var(--green)}
 .od-log-btn{
   font-size:12px;font-weight:700;padding:6px 16px;border-radius:8px;
-  border:1px solid currentColor;background:none;cursor:pointer;
-  transition:opacity .15s;
+  border:1px solid;background:none;cursor:pointer;transition:opacity .15s;
 }
 .od-log-btn:active{opacity:.7}
 
@@ -1666,7 +1663,8 @@ async function loadAllSheetData() {
 // ══════════════════════════════════════════════════════════
 //  RENDER METRICS
 // ══════════════════════════════════════════════════════════
-let currentBB = null; // global — used by session page
+let currentBB = null; // live body battery — display only
+let wakeBB    = null; // wake body battery — used for all training recommendations
 
 function renderMetrics(data) {
   const { snap, todayRow, activities } = data;
@@ -1674,6 +1672,11 @@ function renderMetrics(data) {
   // Body Battery — prefer snap bb_current, fall back to daily bb_wake
   const bbVal = n(snap?.bb_current) ?? n(todayRow?.bb_wake) ?? n(todayRow?.bb_high);
   currentBB = bbVal;
+
+  // Wake BB — used for training recommendations (doesn't deplete through the day)
+  const yDailyRow = (data.daily || []).find(r => r.date === offsetISO(-1)) || {};
+  const wakeVal = n(snap?.bb_wake) ?? n(yDailyRow?.bb_wake) ?? n(todayRow?.bb_wake) ?? null;
+  wakeBB = wakeVal ?? bbVal; // fall back to currentBB if wake not available yet
   if(bbVal !== null) {
     document.getElementById('bb-val').textContent = bbVal;
     document.getElementById('bb-val').style.color = bbColor(bbVal);
@@ -1685,9 +1688,9 @@ function renderMetrics(data) {
       bbVal >= 35 ? 'Moderate — scale if needed' :
       bbVal >= 20 ? 'Low — recovery options only' : 'Very low — rest or mobility';
 
-    // Update session description with BB context
+    // Update session chip using wake BB for recommendations
     const idx = getCycleIdx();
-    updateSessionChip(idx, bbVal);
+    updateSessionChip(idx, wakeBB);
   }
 
   // HRV
@@ -2388,14 +2391,14 @@ function getStretchLog(dateStr) {
 function logStretchDone() {
   S.setJSON('stretch_log_' + todayISO(), {doneAt: new Date().toISOString()});
   renderSessionPage();
-  updateSessionChip(getCycleIdx(), currentBB);
+  updateSessionChip(getCycleIdx(), wakeBB);
   updateSessionLoggedStatus();
   showToast('Stretch logged ✓');
 }
 function clearStretchLog() {
   S.del('stretch_log_' + todayISO());
   renderSessionPage();
-  updateSessionChip(getCycleIdx(), currentBB);
+  updateSessionChip(getCycleIdx(), wakeBB);
   showToast('Stretch cleared');
 }
 function saveTodaySessionLog(dayIdx, shifted, optionName) {
@@ -2410,7 +2413,7 @@ function saveTodaySessionLog(dayIdx, shifted, optionName) {
 
 function renderSessionPage() {
   const todayIdx = getCycleIdx();
-  const bb       = currentBB;
+  const bb       = wakeBB; // recommendations based on wake BB, not live current BB
   const logged   = getTodaySessionLog();
   const day      = DAYS[todayIdx];
   const rule     = getBBRule(todayIdx, bb);
@@ -2539,8 +2542,8 @@ function logOnDemandSession(id, tierIdx) {
     });
   }
   showToast(`${tier.name} logged ✓`);
-  renderOnDemand(currentBB);
-  updateSessionChip(getCycleIdx(), currentBB);
+  renderOnDemand(wakeBB);
+  updateSessionChip(getCycleIdx(), wakeBB);
 }
 
 function unlogOnDemandSession(id) {
@@ -2548,65 +2551,94 @@ function unlogOnDemandSession(id) {
   // Clear session_log only if it was an on-demand entry
   const sl = getTodaySessionLog();
   if(sl?.onDemand) S.del('session_log_' + todayISO());
-  renderOnDemand(currentBB);
-  updateSessionChip(getCycleIdx(), currentBB);
+  renderOnDemand(wakeBB);
+  updateSessionChip(getCycleIdx(), wakeBB);
   showToast('On demand session cleared');
+}
+
+const odExpanded = {}; // track expand state per session id
+
+function toggleOdExpand(id) {
+  odExpanded[id] = !odExpanded[id];
+  renderOnDemand(wakeBB);
+}
+
+function getActiveTierIdx(session, bb) {
+  if(bb === null) return 0;
+  for(let i = 0; i < session.tiers.length; i++) {
+    const t = session.tiers[i];
+    const aboveMin = t.bbMin === undefined || bb >= t.bbMin;
+    const belowMax = t.bbMax === undefined || bb <= t.bbMax;
+    if(aboveMin && belowMax) return i;
+  }
+  return session.tiers.length - 1;
 }
 
 function renderOnDemand(bb) {
   const wrap = document.getElementById('on-demand-cards');
   if(!wrap) return;
 
-  function getActiveTierIdx(session) {
-    if(bb === null) return 0; // default to first if no BB
-    for(let i = 0; i < session.tiers.length; i++) {
-      const t = session.tiers[i];
-      const aboveMin = t.bbMin === undefined || bb >= t.bbMin;
-      const belowMax = t.bbMax === undefined || bb <= t.bbMax;
-      if(aboveMin && belowMax) return i;
-    }
-    return session.tiers.length - 1;
-  }
+  const html = `<div class="card" style="padding:0 0">` +
+    ON_DEMAND.map(session => {
+      const logged    = getOnDemandLog(session.id);
+      const activeIdx = getActiveTierIdx(session, bb);
+      const activeTier = session.tiers[activeIdx];
+      const expanded  = !!odExpanded[session.id];
 
-  wrap.innerHTML = ON_DEMAND.map(session => {
-    const logged   = getOnDemandLog(session.id);
-    const activeIdx = getActiveTierIdx(session);
+      const rowMeta = logged
+        ? `✓ ${logged.name}`
+        : activeTier.name + ' · ' + activeTier.duration;
 
-    const tiersHtml = session.tiers.map((t, i) => {
-      const isActive = i === activeIdx;
-      return `<div class="od-tier ${isActive ? 'od-active' : ''}"
-                   style="${isActive ? `color:${session.color};--tint-color:${session.tint}` : ''}">
-        <div class="od-tier-top">
-          <span class="od-tier-badge">${t.label}</span>
-          <span class="od-tier-name">${t.name}</span>
-          <span class="od-tier-duration">${t.duration}</span>
+      const chevron = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text3);flex-shrink:0;transition:transform .2s;transform:rotate(${expanded?'90':'0'}deg)"><polyline points="9 18 15 12 9 6"/></svg>`;
+
+      const tiersHtml = session.tiers.map((t, i) => {
+        const isActive = i === activeIdx;
+        const activeBorder = isActive ? `border-left:3px solid ${session.color};padding-left:9px;` : '';
+        const activeBg     = isActive ? `background:${session.tint};` : '';
+        return `<div class="od-tier" style="${activeBorder}${activeBg}">
+          <div class="od-tier-top">
+            <span class="od-tier-badge" style="${isActive ? `background:${session.color};color:#0D0F14;` : ''}">${t.label}</span>
+            <span class="od-tier-name">${t.name}${isActive ? ' <span style="font-size:10px;color:var(--text3)">← your BB</span>' : ''}</span>
+            <span class="od-tier-duration">${t.duration}</span>
+          </div>
+          <div class="od-tier-desc">${t.desc}</div>
+        </div>`;
+      }).join('');
+
+      const logRow = logged
+        ? `<div class="od-log-row">
+             <span class="od-logged-label">✓ Logged · ${logged.name}</span>
+             <button class="od-log-btn" style="color:var(--text3);border-color:var(--border2)"
+               onclick="event.stopPropagation();unlogOnDemandSession('${session.id}')">Undo</button>
+           </div>`
+        : `<div class="od-log-row">
+             <span></span>
+             <button class="od-log-btn" style="color:${session.color};border-color:${session.color}"
+               onclick="event.stopPropagation();logOnDemandSession('${session.id}', ${activeIdx})">Log ${activeTier.name}</button>
+           </div>`;
+
+      const expandSection = expanded ? `
+        <div class="od-expand">
+          ${tiersHtml}
+          <div class="od-note">${session.note}</div>
+          ${logRow}
+        </div>` : '';
+
+      return `<div>
+        <div class="od-row" onclick="toggleOdExpand('${session.id}')">
+          <div class="od-row-dot" style="background:${session.color}${logged?';box-shadow:0 0 0 2px var(--green)':''}"></div>
+          <div class="od-row-info">
+            <div class="od-row-name" style="color:${session.color}">${session.name}</div>
+            <div class="od-row-meta">${rowMeta}</div>
+          </div>
+          ${chevron}
         </div>
-        <div class="od-tier-desc">${t.desc}</div>
+        ${expandSection}
       </div>`;
-    }).join('');
+    }).join('') +
+  `</div>`;
 
-    const logRow = logged
-      ? `<div class="od-log-row">
-           <span class="od-logged-label">✓ Logged · ${logged.name}</span>
-           <button class="od-log-btn" style="color:var(--text3);border-color:var(--border)"
-             onclick="unlogOnDemandSession('${session.id}')">Undo</button>
-         </div>`
-      : `<div class="od-log-row">
-           <span></span>
-           <button class="od-log-btn" style="color:${session.color};border-color:${session.color}"
-             onclick="logOnDemandSession('${session.id}', ${activeIdx})">Log BB-Matched Tier</button>
-         </div>`;
-
-    return `<div class="od-card">
-      <div class="od-card-header">
-        <div class="od-card-dot" style="background:${session.color}"></div>
-        <div class="od-card-name">${session.name}</div>
-      </div>
-      ${tiersHtml}
-      <div class="od-note">${session.note}</div>
-      ${logRow}
-    </div>`;
-  }).join('');
+  wrap.innerHTML = html;
 }
 
 // ── Detail view ───────────────────────────────────────────
@@ -2614,7 +2646,7 @@ function openSessionDetail(idx) {
   viewingDayIdx = idx;
   const day    = DAYS[idx];
   const detail = WORKOUT_DETAIL[idx];
-  const bb     = currentBB;
+  const bb     = wakeBB; // wake BB drives recommendations in detail view
   const dc     = DAY_COLOR[day.type] || 'var(--green)';
   const dt     = DAY_TINT[day.type]  || 'var(--green-tint)';
   const rule   = getBBRule(idx, bb);
