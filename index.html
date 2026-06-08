@@ -460,6 +460,47 @@ body{
   content:' ✓';color:var(--green);font-size:12px;
 }
 
+/* ── On Demand cards ─────────────────────────────────────── */
+.od-card{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:var(--radius);padding:14px 16px;margin-bottom:12px;
+}
+.od-card-header{
+  display:flex;align-items:center;gap:10px;margin-bottom:12px;
+}
+.od-card-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.od-card-name{font-size:15px;font-weight:700}
+.od-tier{
+  border-radius:10px;padding:10px 12px;margin-bottom:8px;
+  border:1px solid var(--border);background:rgba(255,255,255,.03);
+  transition:background .15s;
+}
+.od-tier.od-active{
+  border-color:currentColor;background:var(--tint-color);
+}
+.od-tier-top{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.od-tier-badge{
+  font-size:9px;font-weight:700;padding:2px 7px;
+  border-radius:99px;background:rgba(255,255,255,.08);color:var(--text2);
+  white-space:nowrap;
+}
+.od-tier.od-active .od-tier-badge{background:currentColor;color:#0D0F14}
+.od-tier-name{font-size:13px;font-weight:700}
+.od-tier-duration{font-size:11px;color:var(--text3);margin-left:auto}
+.od-tier-desc{font-size:12px;color:var(--text2);line-height:1.5;margin-top:4px}
+.od-note{
+  font-size:11px;color:var(--text3);line-height:1.5;
+  padding-top:10px;border-top:1px solid var(--border);margin-top:4px;
+}
+.od-log-row{display:flex;align-items:center;justify-content:space-between;margin-top:12px}
+.od-logged-label{font-size:12px;color:var(--green)}
+.od-log-btn{
+  font-size:12px;font-weight:700;padding:6px 16px;border-radius:8px;
+  border:1px solid currentColor;background:none;cursor:pointer;
+  transition:opacity .15s;
+}
+.od-log-btn:active{opacity:.7}
+
 /* ── Back button ─────────────────────────────────────────── */
 .back-btn{
   display:flex;align-items:center;gap:6px;
@@ -818,6 +859,12 @@ input:checked ~ .toggle-slider-orange::before{background:var(--orange);transform
     <div style="margin-top:20px">
       <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:10px">Tomorrow</div>
       <div id="tomorrow-card"></div>
+    </div>
+
+    <!-- On Demand -->
+    <div style="margin-top:20px;padding-bottom:8px">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:10px">On Demand</div>
+      <div id="on-demand-cards"></div>
     </div>
   </div>
 
@@ -2291,6 +2338,48 @@ function switchLiftMode(mode) {
 const DAY_COLOR = {lift:'var(--lift)',cardio:'var(--cardio)',swim:'var(--swim)',mobility:'var(--mobility)'};
 const DAY_TINT  = {lift:'var(--lift-tint)',cardio:'var(--cardio-tint)',swim:'var(--swim-tint)',mobility:'var(--mobility-tint)'};
 
+// ══════════════════════════════════════════════════════════
+//  ON DEMAND SESSIONS
+// ══════════════════════════════════════════════════════════
+const ON_DEMAND = [
+  {
+    id:    'recovery_alt',
+    name:  'Recovery — No Pool',
+    color: 'var(--swim)',
+    tint:  'var(--swim-tint)',
+    tiers: [
+      { bbMin:45,           label:'BB 45+',   name:'Bike Ride',
+        duration:'30–40 min',
+        desc:'Zone 2, conversational pace — you should be able to talk the whole time. Kid-friendly with trailer or seat. Pair Polar Verity Sense to Garmin before you go.' },
+      { bbMin:30, bbMax:44, label:'BB 30–44', name:'Brisk Walk',
+        duration:'20–30 min',
+        desc:'Flat route, HR under 120. Kid-friendly — good option on solo parent days. Polar Verity Sense on for data even on an easy day.' },
+      {            bbMax:29, label:'BB <30',   name:'Easy Walk',
+        duration:'10–15 min',
+        desc:'Neighbourhood only. No intensity goal — sunlight and movement. This counts. Keep it short and come home.' },
+    ],
+    note: 'After any tier: tack on 10 min of hip flexors, thoracic rotation, and shoulder mobility if BB and time allow — it compounds over the block.',
+  },
+  {
+    id:    'vo2_max',
+    name:  'VO₂ Max Training',
+    color: 'var(--orange)',
+    tint:  'var(--orange-tint)',
+    tiers: [
+      { bbMin:50,           label:'BB 50+ · Full',  name:'4×4 Intervals',
+        duration:'~45 min',
+        desc:'Outdoor run required — GPS + Polar Verity Sense on arm. 10 min easy warm-up jog → 4 rounds: 4 min hard (RPE 8–9, HR ~160–170) + 3 min easy jog recovery → 10 min cool-down. Best chance at triggering a Garmin VO₂ reading.' },
+      { bbMin:35, bbMax:49, label:'BB 35–49 · Build', name:'Tempo Run',
+        duration:'~30 min',
+        desc:'Outdoor run, GPS + Polar Verity Sense on. 5 min easy warm-up → 20–25 min at comfortably hard pace (RPE 6–7, HR ~140–155) → 5 min cool-down walk. Solid training stimulus, good chance of a Garmin VO₂ update.' },
+      {            bbMax:34, label:'BB <35 · Base',   name:'Easy Jog',
+        duration:'15–20 min',
+        desc:'Outdoor run, GPS + Polar Verity Sense on. Conversational pace, HR ~120–135. Builds aerobic base, maintains running fitness. May or may not trigger a Garmin VO₂ reading — the data still counts.' },
+    ],
+    note: '⚠️ Outdoor GPS required for a Garmin VO₂ Max reading. Treadmill will not update your value no matter the effort.',
+  },
+];
+
 function getTodaySessionLog()  { return S.getJSON('session_log_' + todayISO()); }
 function getStretchLog(dateStr) {
   const v = S.getJSON('stretch_log_' + (dateStr||todayISO()));
@@ -2421,6 +2510,103 @@ function renderSessionPage() {
         <div class="tomorrow-note">${tmrw.sub}</div>
       </div>
     </div>`;
+
+  // ── On Demand ─────────────────────────────────────────────
+  renderOnDemand(bb);
+}
+
+function getOnDemandLog(id) {
+  return S.getJSON('on_demand_log_' + id + '_' + todayISO());
+}
+
+function logOnDemandSession(id, tierIdx) {
+  const session = ON_DEMAND.find(s => s.id === id);
+  if(!session) return;
+  const tier = session.tiers[tierIdx];
+  // Save on-demand log
+  S.setJSON('on_demand_log_' + id + '_' + todayISO(), {
+    id, tierIdx, name: tier.name, at: new Date().toISOString()
+  });
+  // Also write to session_log if nothing logged yet today (for adherence counting)
+  if(!getTodaySessionLog()) {
+    S.setJSON('session_log_' + todayISO(), {
+      dayIdx: getCycleIdx(), shifted: false,
+      dayName: session.name + ' · ' + tier.name,
+      cycleIdx: getCycleIdx(),
+      optionName: tier.name,
+      onDemand: true,
+      at: new Date().toISOString()
+    });
+  }
+  showToast(`${tier.name} logged ✓`);
+  renderOnDemand(currentBB);
+  updateSessionChip(getCycleIdx(), currentBB);
+}
+
+function unlogOnDemandSession(id) {
+  S.del('on_demand_log_' + id + '_' + todayISO());
+  // Clear session_log only if it was an on-demand entry
+  const sl = getTodaySessionLog();
+  if(sl?.onDemand) S.del('session_log_' + todayISO());
+  renderOnDemand(currentBB);
+  updateSessionChip(getCycleIdx(), currentBB);
+  showToast('On demand session cleared');
+}
+
+function renderOnDemand(bb) {
+  const wrap = document.getElementById('on-demand-cards');
+  if(!wrap) return;
+
+  function getActiveTierIdx(session) {
+    if(bb === null) return 0; // default to first if no BB
+    for(let i = 0; i < session.tiers.length; i++) {
+      const t = session.tiers[i];
+      const aboveMin = t.bbMin === undefined || bb >= t.bbMin;
+      const belowMax = t.bbMax === undefined || bb <= t.bbMax;
+      if(aboveMin && belowMax) return i;
+    }
+    return session.tiers.length - 1;
+  }
+
+  wrap.innerHTML = ON_DEMAND.map(session => {
+    const logged   = getOnDemandLog(session.id);
+    const activeIdx = getActiveTierIdx(session);
+
+    const tiersHtml = session.tiers.map((t, i) => {
+      const isActive = i === activeIdx;
+      return `<div class="od-tier ${isActive ? 'od-active' : ''}"
+                   style="${isActive ? `color:${session.color};--tint-color:${session.tint}` : ''}">
+        <div class="od-tier-top">
+          <span class="od-tier-badge">${t.label}</span>
+          <span class="od-tier-name">${t.name}</span>
+          <span class="od-tier-duration">${t.duration}</span>
+        </div>
+        <div class="od-tier-desc">${t.desc}</div>
+      </div>`;
+    }).join('');
+
+    const logRow = logged
+      ? `<div class="od-log-row">
+           <span class="od-logged-label">✓ Logged · ${logged.name}</span>
+           <button class="od-log-btn" style="color:var(--text3);border-color:var(--border)"
+             onclick="unlogOnDemandSession('${session.id}')">Undo</button>
+         </div>`
+      : `<div class="od-log-row">
+           <span></span>
+           <button class="od-log-btn" style="color:${session.color};border-color:${session.color}"
+             onclick="logOnDemandSession('${session.id}', ${activeIdx})">Log BB-Matched Tier</button>
+         </div>`;
+
+    return `<div class="od-card">
+      <div class="od-card-header">
+        <div class="od-card-dot" style="background:${session.color}"></div>
+        <div class="od-card-name">${session.name}</div>
+      </div>
+      ${tiersHtml}
+      <div class="od-note">${session.note}</div>
+      ${logRow}
+    </div>`;
+  }).join('');
 }
 
 // ── Detail view ───────────────────────────────────────────
@@ -3660,10 +3846,12 @@ async function exportData() {
   showToast('Building export…');
   const out = { exportedAt: new Date().toISOString(), sessions: {}, lifestyle: {}, stretch: {}, garmin: null };
 
+  out.on_demand = {};
   Object.keys(localStorage).forEach(k => {
     if(k.startsWith('nam_session_log_')) { const ds = k.replace('nam_session_log_',''); out.sessions[ds] = S.getJSON('session_log_'+ds); }
     else if(k.startsWith('nam_log_'))    { const ds = k.replace('nam_log_','');         out.lifestyle[ds] = S.getJSON('log_'+ds); }
     else if(k.startsWith('nam_stretch_log_')) { const ds = k.replace('nam_stretch_log_',''); out.stretch[ds] = S.getJSON('stretch_log_'+ds); }
+    else if(k.startsWith('nam_on_demand_log_')) { const key = k.replace('nam_on_demand_log_',''); out.on_demand[key] = S.getJSON('on_demand_log_'+key); }
   });
 
   // Attempt to pull Garmin sheet data
