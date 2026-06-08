@@ -2921,7 +2921,8 @@ function notePeriod() {
 
   const snap      = sheetDataGlobal?.snap || {};
   const row       = sheetDataGlobal?.todayRow || {};
-  const hasBBWake = parseFloat(snap.bb_wake)   || parseFloat(row.bb_wake);
+  const yRow      = (sheetDataGlobal?.daily || []).find(r => r.date === offsetISO(-1)) || {};
+  const hasBBWake = parseFloat(snap.bb_wake) || parseFloat(yRow.bb_wake) || parseFloat(row.bb_wake);
   const hasSleep  = parseFloat(snap.sleep_hrs) || parseFloat(row.sleep_hrs);
 
   // Both ready — generate morning note
@@ -3012,7 +3013,10 @@ function buildCoachingContext(data) {
   }
 
   // ── Metrics ────────────────────────────────────────────────
-  const bbWake    = parseFloat(snap.bb_wake)    || parseFloat(row.bb_wake)    || null;
+  // bb_wake for today lives in yesterday's daily log row by design (date offset).
+  // Prefer snap.bb_wake (live snapshot), then yesterday's daily row, then todayRow as last resort.
+  const yesterdayDailyRow = (data.daily || []).find(r => r.date === offsetISO(-1)) || {};
+  const bbWake    = parseFloat(snap.bb_wake) || parseFloat(yesterdayDailyRow.bb_wake) || parseFloat(row.bb_wake) || null;
   const bbCurrent = bb || parseFloat(snap.bb_current) || null;
   const hrv       = parseFloat(snap.hrv_ms)     || parseFloat(row.hrv_ms)     || null;
   const sleepHrs  = parseFloat(snap.sleep_hrs)  || parseFloat(row.sleep_hrs)  || null;
@@ -3185,7 +3189,8 @@ async function generateCoachingNote(forceRefresh = false) {
   if(period === 'waiting') {
     const snap      = sheetDataGlobal?.snap || {};
     const row       = sheetDataGlobal?.todayRow || {};
-    const hasBBWake = parseFloat(snap.bb_wake)   || parseFloat(row.bb_wake);
+    const yRow      = (sheetDataGlobal?.daily || []).find(r => r.date === offsetISO(-1)) || {};
+    const hasBBWake = parseFloat(snap.bb_wake) || parseFloat(yRow.bb_wake) || parseFloat(row.bb_wake);
     const hasSleep  = parseFloat(snap.sleep_hrs) || parseFloat(row.sleep_hrs);
     const missing   = [!hasBBWake && 'wake BB', !hasSleep && 'sleep data'].filter(Boolean).join(' & ');
     if(labelEl) labelEl.textContent = "Morning Note";
