@@ -2556,10 +2556,15 @@ function unlogOnDemandSession(id) {
   showToast('On demand session cleared');
 }
 
-const odExpanded = {}; // track expand state per session id
+const odExpanded     = {}; // track expand state per session id
+const odManualTier   = {}; // manual tier override per session id (null = use BB default)
 
 function toggleOdExpand(id) {
   odExpanded[id] = !odExpanded[id];
+  renderOnDemand(wakeBB);
+}
+function selectOdTier(id, tierIdx) {
+  odManualTier[id] = tierIdx;
   renderOnDemand(wakeBB);
 }
 
@@ -2580,16 +2585,28 @@ function renderOnDemand(bb) {
 
   const html = `<div class="card" style="padding:0 0">` +
     ON_DEMAND.map(session => {
-      const logged    = getOnDemandLog(session.id);
-      const activeIdx = getActiveTierIdx(session, bb);
+      const logged     = getOnDemandLog(session.id);
+      const bbIdx      = getActiveTierIdx(session, bb);
+      const activeIdx  = odManualTier[session.id] ?? bbIdx; // manual override wins
       const activeTier = session.tiers[activeIdx];
-      const expanded  = !!odExpanded[session.id];
+      const expanded   = !!odExpanded[session.id];
+      const isOverride = odManualTier[session.id] !== undefined && odManualTier[session.id] !== bbIdx;
 
       const rowMeta = logged
         ? `✓ ${logged.name}`
-        : activeTier.name + ' · ' + activeTier.duration;
+        : activeTier.name + ' · ' + activeTier.duration + (isOverride ? ' · manual' : '');
 
       const chevron = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text3);flex-shrink:0;transition:transform .2s;transform:rotate(${expanded?'90':'0'}deg)"><polyline points="9 18 15 12 9 6"/></svg>`;
+
+      // Tier selector chips for manual override
+      const tierChips = session.tiers.map((t, i) => {
+        const isSel = i === activeIdx;
+        return `<button onclick="event.stopPropagation();selectOdTier('${session.id}',${i})"
+          style="font-size:10px;font-weight:700;padding:3px 10px;border-radius:99px;cursor:pointer;
+          background:${isSel ? session.color : 'rgba(255,255,255,.06)'};
+          color:${isSel ? '#0D0F14' : 'var(--text3)'};
+          border:1px solid ${isSel ? session.color : 'var(--border)'}">${t.label}</button>`;
+      }).join('');
 
       const tiersHtml = session.tiers.map((t, i) => {
         const isActive = i === activeIdx;
@@ -2597,8 +2614,7 @@ function renderOnDemand(bb) {
         const activeBg     = isActive ? `background:${session.tint};` : '';
         return `<div class="od-tier" style="${activeBorder}${activeBg}">
           <div class="od-tier-top">
-            <span class="od-tier-badge" style="${isActive ? `background:${session.color};color:#0D0F14;` : ''}">${t.label}</span>
-            <span class="od-tier-name">${t.name}${isActive ? ' <span style="font-size:10px;color:var(--text3)">← your BB</span>' : ''}</span>
+            <span class="od-tier-name">${t.name}</span>
             <span class="od-tier-duration">${t.duration}</span>
           </div>
           <div class="od-tier-desc">${t.desc}</div>
@@ -2619,6 +2635,7 @@ function renderOnDemand(bb) {
 
       const expandSection = expanded ? `
         <div class="od-expand">
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">${tierChips}</div>
           ${tiersHtml}
           <div class="od-note">${session.note}</div>
           ${logRow}
@@ -3363,6 +3380,22 @@ function buildCoachingContext(data) {
     }).join(' / ') + ' lbs (today\'s targets)';
   }
 
+  // ── Lift history this cycle — when each lift was last done ─
+  function getLiftHistory() {
+    const results = {};
+    for(const liftKey of ['liftA','liftB']) {
+      const logs = recentLifts(liftKey, 30);
+      if(logs.length) {
+        const last = logs[0];
+        const daysAgo = Math.round((Date.now() - new Date(last.date+'T12:00:00')) / 86400000);
+        results[liftKey] = daysAgo === 0 ? 'done today' : daysAgo === 1 ? 'done yesterday' : `last done ${daysAgo} days ago (${last.date})`;
+      } else {
+        results[liftKey] = 'not yet logged this block';
+      }
+    }
+    return `Lift A: ${results.liftA}. Lift B: ${results.liftB}.`;
+  }
+
   const rule        = getBBRule(idx, bb);
   const hrvTrend    = getHRVTrend();
   const weeklySummary = getWeeklySummary();
@@ -3388,6 +3421,7 @@ Recommendation: "${tomorrowRule.opt}" — ${tomorrowRule.desc}`,
     todayActs:     `Today's activities: ${formatActs(getActsForDate(todayISO()))}`,
     yesterdayActs: `Yesterday's activities: ${formatActs(getActsForDate(offsetISO(-1)))}`,
     liftWeights:   `Lift A: ${liftWeightStr('liftA')}. Lift B: ${liftWeightStr('liftB')}.`,
+    liftHistory:   getLiftHistory(),
   };
 }
 
@@ -3440,7 +3474,7 @@ async function generateCoachingNote(forceRefresh = false) {
   const isMorning = isMorningPeriod(period);
 
   const systemPrompt = isMorning
-    ? `You are Nicholas's personal fitness coach — you know him well. He's 39, a firefighter, down 60 lbs and recomping, carrying a chronic sleep deficit of ~2h20min that has been going on for 12+ months. His HRV baseline is 27–30ms; 33ms+ is a strong day, under 25ms is a flag. His BB rarely exceeds 65 — treat 45+ as decent, 55+ as strong, under 35 as a hard skip trigger. Write a direct, personal 3–4 sentence morning note. Lead with sleep quality: score, hours, deep and REM minutes — tell him what they mean for today's capacity, not just what they are (e.g. low deep = muscular recovery compromised; low REM = cognitive/mood impact). Then give BB and HRV in one sentence with a direct read on whether he's primed to push or needs to manage load. Follow with today's specific session — name the BB-scaled option with the actual threshold, and if it's a lift day, reference that he has goal weights to hit today without listing the specific numbers (the Session tab shows them — just say something like "aim for your goal weights" or similar). Close with one sharp, non-generic action tied to the data — shift context, tomorrow's demands, or a specific recovery lever he can pull today. No motivational filler. Write like you've been coaching him for months.${isNoWake ? ' Wake BB unavailable — use readiness and HRV to assess recovery instead; do not reference wake BB as if it exists.' : ''}${isNoSleep ? ' Sleep data unavailable — do not reference sleep score or hours as if they exist.' : ''}`
+    ? `You are Nicholas's personal fitness coach — you know him well. He's 39, a firefighter, down 60 lbs and recomping, carrying a chronic sleep deficit of ~2h20min that has been going on for 12+ months. His HRV baseline is 27–30ms; 33ms+ is a strong day, under 25ms is a flag. His BB rarely exceeds 65 — treat 45+ as decent, 55+ as strong, under 35 as a hard skip trigger. Write a direct, personal 3–4 sentence morning note. Lead with sleep quality: score, hours, deep and REM minutes — tell him what they mean for today's capacity, not just what they are (e.g. low deep = muscular recovery compromised; low REM = cognitive/mood impact). Then give BB and HRV in one sentence with a direct read on whether he's primed to push or needs to manage load. Follow with today's specific session — if TODAY's session note mentions a shift plan (e.g. "shifting Lift B to today", "doing Lift A instead"), treat that as the primary recommendation and endorse it over the default cycle activity, unless a metric is a hard warning against it (BB under 35 for lifts, HRV crash). Also use the lift history to flag if a lift is overdue and today is a good window to fit it in. If it's a lift day, reference goal weights without listing the numbers (Session tab shows them). Close with one sharp, non-generic action tied to the data — shift context, tomorrow's demands, or a specific recovery lever he can pull today. No motivational filler. Write like you've been coaching him for months.${isNoWake ? ' Wake BB unavailable — use readiness and HRV to assess recovery instead; do not reference wake BB as if it exists.' : ''}${isNoSleep ? ' Sleep data unavailable — do not reference sleep score or hours as if they exist.' : ''}`
     : `You are Nicholas's personal fitness coach — you know him and his life. He's a firefighter on a 48/96 rotation with a wife on the same schedule, young kids, family obligations, and a real life outside training. Missed or skipped sessions happen for legitimate reasons — manual labor, family projects, shift demands, life. Never open with judgment. If a session was skipped or nothing is logged, assume there was a good reason and treat unlogged physical work (yard work, manual labor, helping family) as real exertion. Keep your total response under 400 tokens. Write 4 sentences: (1) Assess today — if a session was done, acknowledge it and note whether the load fit his state; if skipped or unlogged, acknowledge what he likely did instead and frame it as valid recovery context, not failure. (2) Name the single biggest recovery factor for tonight based on the actual data — BB level, alcohol, stress, or sleep debt — and state specifically what it means for tomorrow's numbers, not generically. (3) Give tomorrow's session and the BB threshold that determines full vs. modified option; if today's scheduled session was skipped, note whether it can be shifted to tomorrow or another open slot this cycle. (4) One concrete recovery action for tonight tied to his shift status and home situation. If block adherence is under 60% logged, add one sentence — calm, not critical — identifying the highest-priority session left in the cycle and the best window to fit it. Tone: encouraging, data-grounded, like a coach who knows his life isn't just training.`;
 
   const userMsg = `${ctx.profile}
@@ -3458,6 +3492,7 @@ TODAY: ${ctx.todayLog}
 ${ctx.todayActs}
 
 ${ctx.liftWeights}
+LIFT HISTORY: ${ctx.liftHistory}
 
 PRINCIPLE: Body Battery over schedule. Sleep over training. Longevity is the goal.`;
 
@@ -3531,30 +3566,57 @@ function renderTrends(data) {
   document.getElementById('adh-week').textContent    = `Week ${weekNum} of ${WEEK_TOTAL}`;
   document.getElementById('adh-day-count').textContent = `Day ${blockDay} of ${WEEK_TOTAL * 6}`;
 
-  // Count logged sessions from tracking start (not block start)
+  // Helper: any on-demand session logged for a given date
+  function hasOnDemand(dateStr) {
+    return ON_DEMAND.some(s => !!S.getJSON('on_demand_log_' + s.id + '_' + dateStr));
+  }
+  // Helper: nicotine goal met for a given date (entry exists AND lozenges <= goal)
+  function nicGoalMet(dateStr) {
+    const entry = S.getJSON('nic_' + dateStr);
+    if(!entry) return false;
+    return (entry.lozenges || 0) <= getNicGoal(dateStr);
+  }
+
+  // Count logged sessions from tracking start (cycle + on-demand both count)
   let sessionCount = 0;
   for(let i=0; i<trackDiff+1; i++) {
-    if(S.getJSON('session_log_' + offsetISO(-i))) sessionCount++;
+    const ds = offsetISO(-i);
+    if(S.getJSON('session_log_' + ds) || hasOnDemand(ds)) sessionCount++;
   }
   document.getElementById('adh-sessions').textContent = sessionCount;
 
   // Last 12 days adherence dots — 2 rows of 6
   const dots = [];
   for(let i=11; i>=0; i--) {
-    const ds  = offsetISO(-i);
-    const log = S.getJSON('session_log_' + ds);
-    const d   = new Date(ds+'T12:00:00');
-    const lbl = d.toLocaleDateString('en-US',{weekday:'narrow'});
-    const isToday = i === 0;
-    const stretch = getStretchLog(ds);
+    const ds       = offsetISO(-i);
+    const cycleLog = S.getJSON('session_log_' + ds);
+    const odLogged = hasOnDemand(ds);
+    const anySession = cycleLog || odLogged;
+    const isCycle  = cycleLog && !cycleLog.onDemand; // green = cycle session
+    const d        = new Date(ds+'T12:00:00');
+    const lbl      = d.toLocaleDateString('en-US',{weekday:'narrow'});
+    const isToday  = i === 0;
+    const stretch  = getStretchLog(ds);
+    const nicMet   = nicGoalMet(ds);
+
     let bg = 'rgba(255,255,255,.06)', color = 'var(--text3)', icon = '·';
-    if(log) { bg = 'var(--green-tint)'; color = 'var(--green)'; icon = '✓'; }
-    if(isToday && !log) { bg = 'rgba(255,255,255,.1)'; }
-    const ringCls = stretch ? ' stretched' : '';
-    const tappable = log ? ' tappable' : '';
-    const clickAttr = log ? `onclick="showDayDetail('${ds}')"` : '';
+    if(anySession) {
+      if(isCycle) { bg = 'var(--green-tint)';  color = 'var(--green)'; }
+      else        { bg = 'var(--swim-tint)';    color = 'var(--swim)';  } // cyan = on-demand only
+      icon = '✓';
+    }
+    if(isToday && !anySession) { bg = 'rgba(255,255,255,.1)'; }
+
+    // Build box-shadow: stretch = outer purple ring, nicotine = inner orange ring
+    const shadows = [];
+    if(stretch) shadows.push('0 0 0 2.5px var(--mobility)');
+    if(nicMet)  shadows.push('inset 0 0 0 2px var(--orange)');
+    const shadowStyle = shadows.length ? `box-shadow:${shadows.join(',')};` : '';
+
+    const tappable  = anySession ? ' tappable' : '';
+    const clickAttr = cycleLog ? `onclick="showDayDetail('${ds}')"` : '';
     dots.push(`<div style="text-align:center">
-      <div class="adh-dot${ringCls}${tappable}" style="background:${bg};color:${color};${isToday&&!log?'border:1.5px solid rgba(255,255,255,.2)':''}" ${clickAttr}>${icon}</div>
+      <div class="adh-dot${tappable}" style="background:${bg};color:${color};${shadowStyle}${isToday&&!anySession?'border:1.5px solid rgba(255,255,255,.2)':''}" ${clickAttr}>${icon}</div>
       <div style="font-size:8px;color:var(--text3);margin-top:3px;font-weight:600">${lbl}</div>
     </div>`);
   }
