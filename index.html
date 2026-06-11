@@ -3985,8 +3985,8 @@ function getNicGoal(dateStr) {
   if(y > 2026 || (y===2026 && m >= 12)) return 0;
   if(y===2026 && m === 11) return 3;
   if(y===2026 && m === 10) return 5;
-  if(y===2026 && (m===8 || m===9)) return 15;
-  return 24; // Jun–Jul 2026 (and before)
+  if(y===2026 && (m===7 || m===8 || m===9)) return 15;
+  return 24; // Jun 2026 and before
 }
 
 function getNicBadgeClass(lozenges, goal) {
@@ -4016,8 +4016,8 @@ function getNicPhaseLabel(dateStr) {
   if(goal === 0)  return 'Phase 5 · Dec 2026 · 0 lozenges · No patch';
   if(goal === 3)  return 'Phase 4 · Nov 2026 · 3 lozenges · 7mg patch';
   if(goal === 5)  return 'Phase 3 · Oct 2026 · 5 lozenges · 7mg patch';
-  if(goal === 15) return 'Phase 2 · Aug–Sep 2026 · 15 lozenges · 14mg patch';
-  return 'Phase 1 · Jun–Jul 2026 · 24 lozenges · 21mg patch';
+  if(goal === 15) return 'Phase 2 · Jul–Sep 2026 · 15 lozenges · 14mg patch';
+  return 'Phase 1 · Jun 2026 · 24 lozenges · 21mg patch';
 }
 
 function switchNicDate(offset) {
