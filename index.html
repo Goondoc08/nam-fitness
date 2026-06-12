@@ -1570,6 +1570,28 @@ function bbColor(v) {
 function bbBadgeClass(v) {
   return v >= 50 ? 'badge-green' : v >= 35 ? 'badge-yellow' : v >= 20 ? 'badge-orange' : 'badge-red';
 }
+function trColor(v) {
+  // Garmin 5-tier training readiness scale
+  if(v >= 80) return '#4FC3F7';        // Prime — sky blue
+  if(v >= 60) return 'var(--green)';   // Primed — green
+  if(v >= 40) return 'var(--orange)';  // Recovering — orange
+  if(v >= 20) return 'var(--lift)';    // Strained — crimson
+  return '#8B0000';                    // Very Strained — dark red
+}
+function trBadgeClass(v) {
+  if(v >= 80) return 'badge-blue';
+  if(v >= 60) return 'badge-green';
+  if(v >= 40) return 'badge-orange';
+  if(v >= 20) return 'badge-red';
+  return 'badge-red';
+}
+function trLabel(v) {
+  if(v >= 80) return 'Prime';
+  if(v >= 60) return 'Primed';
+  if(v >= 40) return 'Recovering';
+  if(v >= 20) return 'Strained';
+  return 'Very Strained';
+}
 
 // ══════════════════════════════════════════════════════════
 //  RENDER STATIC UI
@@ -1723,14 +1745,11 @@ function renderMetrics(data) {
   const tr = n(snap?.training_readiness ?? todayRow?.training_readiness);
   if(tr !== null) {
     document.getElementById('tr-val').textContent = tr;
-    const trColor = tr >= 67 ? 'var(--green)' : tr >= 34 ? 'var(--cardio)' : 'var(--lift)';
+    document.getElementById('tr-val').style.color = trColor(tr);
     const trBar = document.getElementById('tr-bar');
     trBar.style.width = tr + '%';
-    trBar.style.background = trColor;
-    document.getElementById('tr-badge').innerHTML = makeBadge(
-      tr >= 67 ? 'Ready' : tr >= 34 ? 'Moderate' : 'Low — reduce load',
-      tr >= 67 ? 'badge-green' : tr >= 34 ? 'badge-yellow' : 'badge-red'
-    );
+    trBar.style.background = trColor(tr);
+    document.getElementById('tr-badge').innerHTML = makeBadge(trLabel(tr), trBadgeClass(tr));
   }
 
   // Training status
