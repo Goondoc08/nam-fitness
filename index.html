@@ -3380,15 +3380,28 @@ function buildCoachingContext(data) {
     }).join(' / ') + ' lbs (today\'s targets)';
   }
 
-  // ── Lift history this cycle — when each lift was last done ─
+  // ── Lift history — checks session logs (primary) + weight logs (fallback) ─
   function getLiftHistory() {
+    // dayIdx 0 = Lift A, dayIdx 3 = Lift B
+    const liftDayIdx = { liftA: 0, liftB: 3 };
     const results = {};
     for(const liftKey of ['liftA','liftB']) {
-      const logs = recentLifts(liftKey, 30);
-      if(logs.length) {
-        const last = logs[0];
-        const daysAgo = Math.round((Date.now() - new Date(last.date+'T12:00:00')) / 86400000);
-        results[liftKey] = daysAgo === 0 ? 'done today' : daysAgo === 1 ? 'done yesterday' : `last done ${daysAgo} days ago (${last.date})`;
+      let bestDate = null;
+      // Check session logs for up to 30 days back
+      for(let i = 0; i < 30; i++) {
+        const ds  = offsetISO(-i);
+        const sl  = S.getJSON('session_log_' + ds);
+        if(sl && sl.dayIdx === liftDayIdx[liftKey]) { bestDate = ds; break; }
+      }
+      // Also check lift weight logs — use whichever is more recent
+      const weightLogs = recentLifts(liftKey, 1);
+      if(weightLogs.length) {
+        const wDate = weightLogs[0].date;
+        if(!bestDate || wDate > bestDate) bestDate = wDate;
+      }
+      if(bestDate) {
+        const daysAgo = Math.round((Date.now() - new Date(bestDate+'T12:00:00')) / 86400000);
+        results[liftKey] = daysAgo === 0 ? 'done today' : daysAgo === 1 ? 'done yesterday' : `last done ${daysAgo} days ago (${bestDate})`;
       } else {
         results[liftKey] = 'not yet logged this block';
       }
