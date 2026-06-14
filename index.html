@@ -3209,7 +3209,7 @@ function buildCoachingContext(data) {
   const acts = data?.activityLog || [];
   const idx  = getCycleIdx();
   const day  = DAYS[idx];
-  const bb   = currentBB;
+  const bb   = wakeBB ?? currentBB; // wake BB drives all training recommendations
   const weekNum      = getWeekNum();
   const tomorrowIdx  = (idx + 1) % 6;
   const tomorrow     = DAYS[tomorrowIdx];
