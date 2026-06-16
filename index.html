@@ -695,6 +695,9 @@ input:checked ~ .toggle-slider-orange::before{background:var(--orange);transform
     <div class="badge badge-gray" id="shift-badge">—</div>
   </div>
 
+  <!-- Planning layer -->
+  <div id="plan-layer" style="margin-bottom:12px"></div>
+
   <!-- Export nudge -->
   <div class="export-nudge" id="export-nudge" style="display:none">
     <div class="export-nudge-text">📤 New month — export your data for deeper analysis in Claude</div>
@@ -753,6 +756,7 @@ input:checked ~ .toggle-slider-orange::before{background:var(--orange);transform
       <div style="font-size:36px;font-weight:800;line-height:1" id="sleep-val">—</div>
       <div style="margin-top:8px" id="sleep-badge"></div>
       <div style="font-size:11px;color:var(--text3);margin-top:4px" id="sleep-hrs">— hrs</div>
+      <div id="spo2-accum-line" style="display:none;font-size:11px;margin-top:4px"></div>
     </div>
   </div>
 
@@ -786,6 +790,20 @@ input:checked ~ .toggle-slider-orange::before{background:var(--orange);transform
       <div style="font-size:36px;font-weight:800;line-height:1" id="vo2-val">—</div>
       <div style="font-size:11px;color:var(--text3);margin-top:8px">Target 34–35</div>
     </div>
+  </div>
+
+  <!-- BP Trend Card (shown when ≥3 readings) -->
+  <div class="card" id="bp-trend-card" style="display:none;margin-bottom:10px">
+    <div class="card-label">🩺 Blood Pressure</div>
+    <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:8px">
+      <div style="font-size:32px;font-weight:800;line-height:1" id="bp-latest-reading">—</div>
+      <div style="font-size:16px;font-weight:700;color:var(--text3)" id="bp-latest-pulse"></div>
+      <div style="font-size:12px;color:var(--text3);margin-left:auto" id="bp-latest-time"></div>
+    </div>
+    <div id="bp-class-badge" style="margin-bottom:10px"></div>
+    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:6px">14-Day Systolic</div>
+    <div class="spark-bars" id="bp-spark" style="height:44px;align-items:flex-end;display:flex;gap:3px"></div>
+    <div style="font-size:11px;color:var(--text3);margin-top:8px" id="bp-readings-footer"></div>
   </div>
 
   <!-- Row 4: Intensity Minutes (narrow) -->
@@ -975,6 +993,19 @@ input:checked ~ .toggle-slider-orange::before{background:var(--orange);transform
       </div>
     </div>
 
+    <!-- Protein -->
+    <div class="log-row">
+      <div>
+        <div class="log-row-label">💪 Protein goal hit</div>
+        <div class="log-row-sub">~180–200g</div>
+      </div>
+      <div class="tog-group">
+        <button class="tog-btn" id="protein-hit"    onclick="setProtein('hit')">Hit it</button>
+        <button class="tog-btn" id="protein-close"  onclick="setProtein('close')">Close</button>
+        <button class="tog-btn" id="protein-missed" onclick="setProtein('missed')">Missed</button>
+      </div>
+    </div>
+
     <!-- High-acuity shift -->
     <div style="padding:14px 0 0">
       <div style="display:flex;align-items:center;justify-content:space-between">
@@ -992,6 +1023,33 @@ input:checked ~ .toggle-slider-orange::before{background:var(--orange);transform
           placeholder="Brief note — what happened, outcome, how you're feeling…"
           oninput="logState.acuityNote=this.value" rows="3"></textarea>
       </div>
+    </div>
+
+    <!-- Blood Pressure -->
+    <div style="padding:14px 0 0">
+      <div class="log-row-label" style="margin-bottom:10px">🩺 Blood Pressure</div>
+      <div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:10px">
+        <div style="flex:1;text-align:center">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:5px">Systolic</div>
+          <input type="number" class="form-input" id="bp-sys" placeholder="120" inputmode="numeric" min="60" max="250" style="text-align:center;font-size:20px;font-weight:800;padding:8px 4px">
+        </div>
+        <div style="font-size:22px;font-weight:300;color:var(--text3);padding-bottom:10px">/</div>
+        <div style="flex:1;text-align:center">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:5px">Diastolic</div>
+          <input type="number" class="form-input" id="bp-dia" placeholder="80" inputmode="numeric" min="30" max="150" style="text-align:center;font-size:20px;font-weight:800;padding:8px 4px">
+        </div>
+        <div style="flex:1;text-align:center">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:5px">Pulse</div>
+          <input type="number" class="form-input" id="bp-pulse" placeholder="72" inputmode="numeric" min="30" max="220" style="text-align:center;font-size:20px;font-weight:800;padding:8px 4px">
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;margin-bottom:8px">
+        <button class="tog-btn act-blue" id="bp-time-morning"   onclick="setBPTime('morning')">Morning</button>
+        <button class="tog-btn"          id="bp-time-afternoon" onclick="setBPTime('afternoon')">Afternoon</button>
+        <button class="tog-btn"          id="bp-time-evening"   onclick="setBPTime('evening')">Evening</button>
+      </div>
+      <div style="font-size:11px;color:var(--text3)">Morning reading before coffee is most clinically useful</div>
+      <div id="bp-flag-inline" style="display:none;margin-top:8px;font-size:12px;font-weight:700;padding:6px 10px;border-radius:8px;line-height:1.4"></div>
     </div>
 
   </div><!-- end log-card -->
@@ -1378,6 +1436,156 @@ function getSheetsKey()     { return S.get('sheets_key') || ''; }
 function getSheetId()       { return S.get('sheet_id') || SHEET_ID_DEFAULT; }
 function getWeightTarget()  { return S.get('weight_target') || ''; }
 
+// ── Planning layer ─────────────────────────────────────────
+function getPlan() {
+  return S.getJSON('plan_current') || { week_intent:'', session_overrides:{}, updated_at:'' };
+}
+function savePlan(plan) {
+  S.setJSON('plan_current', {...plan, updated_at: new Date().toISOString()});
+}
+
+// ── Rolling session notes (max 4) ─────────────────────────
+function getSessionNotes() { return S.getJSON('session_notes') || []; }
+function pushSessionNote(entry) {
+  const notes = getSessionNotes();
+  notes.unshift(entry);
+  S.setJSON('session_notes', notes.slice(0, 4));
+}
+
+// ── BP log ────────────────────────────────────────────────
+function getBPLog(dateStr) { return S.getJSON('bp_' + dateStr); }
+function saveBPLog(dateStr, entry) {
+  S.setJSON('bp_' + dateStr, {...entry, date: dateStr, saved_at: new Date().toISOString()});
+}
+function getAllBPLogs() {
+  return Object.keys(localStorage)
+    .filter(k => k.startsWith('nam_bp_'))
+    .map(k => { try { return JSON.parse(localStorage.getItem(k)); } catch(e) { return null; } })
+    .filter(Boolean)
+    .sort((a, b) => b.date.localeCompare(a.date));
+}
+
+// ── Medical context ───────────────────────────────────────
+function getMedical() {
+  return S.getJSON('medical') || {
+    sleep_study_status:'ordered', glp1_dose:'40 units/week',
+    nicotine_stage:'~9 lozenges/day, patch trial ongoing',
+    bp_monitoring:'active, machine incoming',
+    pcp_last_visit:'', notes:''
+  };
+}
+function saveMedical(data) { S.setJSON('medical', data); }
+
+// ══════════════════════════════════════════════════════════
+//  PLANNING LAYER
+// ══════════════════════════════════════════════════════════
+
+let planLayerExpanded = false;
+
+function togglePlanLayer() {
+  planLayerExpanded = !planLayerExpanded;
+  const body  = document.getElementById('plan-layer-body');
+  const arrow = document.getElementById('plan-layer-arrow');
+  if(body)  body.style.display  = planLayerExpanded ? 'block' : 'none';
+  if(arrow) arrow.textContent   = planLayerExpanded ? '▲' : '▼';
+}
+
+function selectPlanDate(dateStr) {
+  document.querySelectorAll('.plan-date-btn').forEach(b => {
+    b.classList.toggle('act-blue', b.dataset.date === dateStr);
+  });
+  const inp = document.getElementById('plan-override-text');
+  if(!inp) return;
+  const plan = getPlan();
+  inp.value = plan.session_overrides[dateStr] || '';
+  inp.dataset.date = dateStr;
+}
+
+function addPlanOverride() {
+  const inp = document.getElementById('plan-override-text');
+  if(!inp || !inp.dataset.date || !inp.value.trim()) return;
+  const plan = getPlan();
+  plan.session_overrides[inp.dataset.date] = inp.value.trim();
+  savePlan(plan);
+  renderPlanLayer();
+  // re-select the same date so editing continues
+  selectPlanDate(inp.dataset.date);
+}
+
+function deletePlanOverride(dateStr) {
+  const plan = getPlan();
+  delete plan.session_overrides[dateStr];
+  savePlan(plan);
+  renderPlanLayer();
+}
+
+function savePlanLayer() {
+  const intentEl = document.getElementById('plan-week-intent');
+  const plan = getPlan();
+  plan.week_intent = intentEl ? intentEl.value.trim() : plan.week_intent;
+  savePlan(plan);
+  showToast('Plan saved ✓');
+}
+
+function renderPlanLayer() {
+  const container = document.getElementById('plan-layer');
+  if(!container) return;
+
+  const plan = getPlan();
+
+  // Build 3-day date list: today, tomorrow, day after
+  const days = [0, 1, 2].map(i => {
+    const d = new Date();
+    d.setDate(d.getDate() + i);
+    return d.toISOString().split('T')[0];
+  });
+
+  const fmt = ds => {
+    const [y, m, day] = ds.split('-');
+    const labels = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const d = new Date(+y, +m - 1, +day);
+    return labels[d.getDay()] + ' ' + (+day);
+  };
+
+  const overrideList = days
+    .filter(d => plan.session_overrides[d])
+    .map(d => `
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:12px">
+        <span style="color:var(--text3);min-width:46px">${fmt(d)}</span>
+        <span style="flex:1;color:var(--text1)">${plan.session_overrides[d]}</span>
+        <button onclick="deletePlanOverride('${d}')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;padding:0 4px">✕</button>
+      </div>`).join('');
+
+  const dateBtns = days.map(d =>
+    `<button class="tog-btn plan-date-btn" data-date="${d}" onclick="selectPlanDate('${d}')">${fmt(d)}</button>`
+  ).join('');
+
+  container.innerHTML = `
+    <div class="card" style="padding:12px 14px">
+      <div onclick="togglePlanLayer()" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none">
+        <span style="font-size:12px;font-weight:700;color:var(--text2);letter-spacing:.05em">WEEK PLAN</span>
+        <span id="plan-layer-arrow" style="color:var(--text3);font-size:11px">${planLayerExpanded ? '▲' : '▼'}</span>
+      </div>
+      <div id="plan-layer-body" style="display:${planLayerExpanded ? 'block' : 'none'};margin-top:12px">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Week intent</div>
+        <textarea id="plan-week-intent" rows="2"
+          style="width:100%;background:var(--card2);border:1px solid #333;border-radius:6px;color:var(--text1);font-size:13px;padding:8px;resize:none;box-sizing:border-box"
+          placeholder="e.g. Focus on recovery, shift ends Wed">${plan.week_intent}</textarea>
+        <button onclick="savePlanLayer()" style="margin-top:6px;padding:5px 14px;background:var(--blue);border:none;border-radius:6px;color:#fff;font-size:12px;font-weight:700;cursor:pointer">Save</button>
+
+        <div style="margin-top:14px;font-size:11px;color:var(--text3);margin-bottom:6px">Session overrides</div>
+        ${overrideList || '<div style="font-size:11px;color:var(--text3);margin-bottom:8px">No overrides set</div>'}
+
+        <div style="display:flex;gap:6px;margin-bottom:8px">${dateBtns}</div>
+        <div style="display:flex;gap:6px">
+          <input id="plan-override-text" type="text" placeholder="Override note…"
+            style="flex:1;background:var(--card2);border:1px solid #333;border-radius:6px;color:var(--text1);font-size:12px;padding:6px 8px">
+          <button onclick="addPlanOverride()" style="padding:6px 12px;background:var(--blue);border:none;border-radius:6px;color:#fff;font-size:12px;font-weight:700;cursor:pointer">Add</button>
+        </div>
+      </div>
+    </div>`;
+}
+
 // ══════════════════════════════════════════════════════════
 //  FIRST RUN
 // ══════════════════════════════════════════════════════════
@@ -1436,7 +1644,7 @@ function regenCoachingNote(period) {
     showToast(`${period === 'morning' ? 'Morning' : 'Evening'} note already regenerated today`);
     return;
   }
-  // Clear cached note so generateCoachingNote will call the API fresh
+  // Clear cached note so generateDailyBrief will call the API fresh
   const noteKey = `nam_coaching_${period}_${todayISO()}`;
   S.del(noteKey);
   // Mark used — can't regenerate again today
@@ -1446,7 +1654,7 @@ function regenCoachingNote(period) {
   closeSettings();
   // Switch to Today tab and regenerate
   showPage('today');
-  generateCoachingNote(true);
+  generateDailyBrief(true);
   showToast(`Regenerating ${period} note…`);
 }
 
@@ -1652,34 +1860,27 @@ async function fetchSheet(tabName) {
   return parseSheet(await res.json());
 }
 
+async function fetchSnapshot() {
+  const rows = await fetchSheet(TAB_SNAPSHOT);
+  if(!rows || !rows.length) return null;
+  const snap = rows[0];
+  let activities = [];
+  if(snap.activities_json) {
+    try { activities = JSON.parse(snap.activities_json); } catch(e) { activities = []; }
+  }
+  return { snap, activities };
+}
+
 async function loadAllSheetData() {
-  const [daily, snapshot, activityLog] = await Promise.all([
-    fetchSheet(TAB_DAILY),
-    fetchSheet(TAB_SNAPSHOT),
-    fetchSheet(TAB_ACTIVITIES),
-  ]);
-
-  // ── Current Snapshot ─────────────────────────────
-  let snap = null, activities = [];
-  if(snapshot && snapshot.length) {
-    snap = snapshot[0]; // row 2 — live metrics
-    // Activities are now a JSON string in the activities_json column
-    if(snap.activities_json) {
-      try { activities = JSON.parse(snap.activities_json); } catch(e) { activities = []; }
-    }
+  // Primary — snapshot drives all today's metrics
+  const snapResult = await fetchSnapshot();
+  if(!snapResult) {
+    return { snap: null, activities: [], daily: [], dataUnavailable: true };
   }
-
-  // ── Daily Log ────────────────────────────────────
-  let todayRow = null;
-  if(daily && daily.length) {
-    const hasAnyData = r => r && Object.entries(r).some(([k,v]) => k !== 'date' && v && v !== '');
-    const allSorted  = daily.filter(r => r.date).sort((a,b) => b.date.localeCompare(a.date));
-    const exact      = allSorted.find(r => r.date === todayISO());
-    // Use today's row if it has any data, otherwise fall back to most recent filled row
-    todayRow = (exact && hasAnyData(exact)) ? exact : (allSorted.find(r => hasAnyData(r)) || null);
-  }
-
-  return { snap, activities, todayRow, daily: daily || [], activityLog: activityLog || [] };
+  const { snap, activities } = snapResult;
+  // Secondary — daily log for historical data only (lazy, after primary succeeds)
+  const dailyRows = await fetchSheet(TAB_DAILY);
+  return { snap, activities, daily: dailyRows || [] };
 }
 
 // ══════════════════════════════════════════════════════════
@@ -1689,34 +1890,32 @@ let currentBB = null; // live body battery — display only
 let wakeBB    = null; // wake body battery — used for all training recommendations
 
 function renderMetrics(data) {
-  const { snap, todayRow, activities } = data;
+  const { snap, activities } = data;
+  if(!snap) return;
 
-  // Body Battery — prefer snap bb_current, fall back to daily bb_wake
-  const bbVal = n(snap?.bb_current) ?? n(todayRow?.bb_wake) ?? n(todayRow?.bb_high);
-  currentBB = bbVal;
+  // Body Battery — bb_current for display, bb_wake for all training decisions
+  currentBB = n(snap.bb_current);
+  wakeBB    = n(snap.bb_wake);
 
-  // Wake BB — used for training recommendations (doesn't deplete through the day)
-  const yDailyRow = (data.daily || []).find(r => r.date === offsetISO(-1)) || {};
-  const wakeVal = n(snap?.bb_wake) ?? n(yDailyRow?.bb_wake) ?? n(todayRow?.bb_wake) ?? null;
-  wakeBB = wakeVal ?? bbVal; // fall back to currentBB if wake not available yet
-  if(bbVal !== null) {
-    document.getElementById('bb-val').textContent = bbVal;
-    document.getElementById('bb-val').style.color = bbColor(bbVal);
+  const bbDisplay = currentBB ?? wakeBB;
+  if(bbDisplay !== null) {
+    document.getElementById('bb-val').textContent = bbDisplay;
+    document.getElementById('bb-val').style.color = bbColor(bbDisplay);
     const bbBar = document.getElementById('bb-bar');
-    bbBar.style.width = bbVal + '%';
-    bbBar.style.background = bbColor(bbVal);
-    document.getElementById('bb-sub').textContent =
-      bbVal >= 50 ? 'Cleared for full session' :
-      bbVal >= 35 ? 'Moderate — scale if needed' :
-      bbVal >= 20 ? 'Low — recovery options only' : 'Very low — rest or mobility';
-
-    // Update session chip using wake BB for recommendations
-    const idx = getCycleIdx();
-    updateSessionChip(idx, wakeBB);
+    bbBar.style.width = bbDisplay + '%';
+    bbBar.style.background = bbColor(bbDisplay);
+    const ref = wakeBB ?? bbDisplay;
+    const desc = ref >= 50 ? 'Cleared for full session' :
+                 ref >= 35 ? 'Moderate — scale if needed' :
+                 ref >= 20 ? 'Low — recovery options only' : 'Very low — rest or mobility';
+    const wakeStr = (wakeBB !== null && currentBB !== null && currentBB !== wakeBB)
+      ? `Wake ${wakeBB} · ` : '';
+    document.getElementById('bb-sub').textContent = wakeStr + desc;
+    updateSessionChip(getCycleIdx(), wakeBB ?? currentBB);
   }
 
-  // HRV
-  const hrv = n(todayRow?.hrv_ms);
+  // HRV — snapshot only
+  const hrv = n(snap.hrv_ms);
   if(hrv !== null) {
     document.getElementById('hrv-val').textContent = hrv;
     const [cls, label] = hrv >= 33 ? ['badge-green','✅ Strong — above baseline'] :
@@ -1726,10 +1925,9 @@ function renderMetrics(data) {
     document.getElementById('hrv-badge').innerHTML = makeBadge(label, cls);
   }
 
-  // Sleep
-  // Prefer snapshot sleep — daily row sleep is often blank until next morning's full sync
-  const slScore = n(snap?.sleep_score) ?? n(todayRow?.sleep_score);
-  const slHrs   = n(snap?.sleep_hrs)   ?? n(todayRow?.sleep_hrs);
+  // Sleep — snapshot only
+  const slScore = n(snap.sleep_score);
+  const slHrs   = n(snap.sleep_hrs);
   if(slScore !== null) {
     document.getElementById('sleep-val').textContent = slScore;
     document.getElementById('sleep-val').style.color =
@@ -1740,9 +1938,10 @@ function renderMetrics(data) {
     );
   }
   if(slHrs !== null) document.getElementById('sleep-hrs').textContent = `${slHrs} hrs`;
+  renderSpo2Accum(data.daily || []);
 
-  // Training readiness
-  const tr = n(snap?.training_readiness ?? todayRow?.training_readiness);
+  // Training readiness — snapshot only
+  const tr = n(snap.training_readiness);
   if(tr !== null) {
     document.getElementById('tr-val').textContent = tr;
     document.getElementById('tr-val').style.color = trColor(tr);
@@ -1752,16 +1951,16 @@ function renderMetrics(data) {
     document.getElementById('tr-badge').innerHTML = makeBadge(trLabel(tr), trBadgeClass(tr));
   }
 
-  // Training status
-  const ts = snap?.training_status || todayRow?.training_status;
+  // Training status — snapshot only
+  const ts = snap.training_status;
   if(ts) {
     document.getElementById('ts-val').textContent = ts;
     document.getElementById('ts-badge').innerHTML = makeBadge(ts, TS_COLORS[ts] || 'badge-gray');
   }
 
-  // VO2
-  const vo2Rows = data.daily.filter(r => r.date && n(r.vo2_max) !== null).sort((a,b)=>b.date.localeCompare(a.date));
-  const vo2 = vo2Rows.length ? n(vo2Rows[0].vo2_max) : (n(snap?.vo2_max));
+  // VO2 — daily log only (historical)
+  const vo2Rows = (data.daily || []).filter(r => r.date && n(r.vo2_max) !== null).sort((a,b)=>b.date.localeCompare(a.date));
+  const vo2 = vo2Rows.length ? n(vo2Rows[0].vo2_max) : n(snap.vo2_max);
   if(vo2 !== null) {
     document.getElementById('vo2-val').textContent = vo2;
     document.getElementById('vo2-val').style.color =
@@ -1825,8 +2024,8 @@ function renderMetrics(data) {
     bar.style.background = barColor;
   }
 
-  // Activities
-  if(activities.length) {
+  // Activities — from snapshot
+  if(activities && activities.length) {
     const actCard = document.getElementById('activities-card');
     actCard.style.display = 'block';
     document.getElementById('activities-list').innerHTML = activities.map((a, i) => {
@@ -1839,11 +2038,13 @@ function renderMetrics(data) {
       if(a.extra)        chips.push(a.extra);
       const isLast = i === activities.length - 1;
       return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;${isLast?'':'border-bottom:1px solid var(--border)'}">
-        <div style="font-size:14px;font-weight:600;color:var(--text1)">${name}</div>
+        <div style="font-size:14px;font-weight:600;color:var(--text)">${name}</div>
         <div style="font-size:12px;color:var(--text3);text-align:right">${chips.join(' · ')}</div>
       </div>`;
     }).join('');
   }
+
+  renderBPCard();
 }
 
 // ══════════════════════════════════════════════════════════
@@ -2893,17 +3094,18 @@ const CAF_SHORT  = {'before-noon':'<noon','noon-2':'noon-2p','2-4':'2–4p','4-6
 
 let logState = {
   etoh:0, caffeineCups:0, caffeineTime:'',
-  meals:'', highAcuity:false, acuityNote:'',
+  meals:'', protein:'', highAcuity:false, acuityNote:'',
   sessionDone:'', sessionNote:'', weight:null
 };
+let bpState = { systolic:null, diastolic:null, pulse:null, time_of_day:'morning' };
 let logDateOffset = 0; // 0=today, 1=yesterday, etc.
 
 function logTargetDate() { return offsetISO(-logDateOffset); }
 
 function switchLogDate(offset) {
   logDateOffset = offset;
-  // Reset state
-  logState = {etoh:0,caffeineCups:0,caffeineTime:'',meals:'',highAcuity:false,acuityNote:'',sessionDone:'',sessionNote:'',weight:null};
+  logState = {etoh:0,caffeineCups:0,caffeineTime:'',meals:'',protein:'',highAcuity:false,acuityNote:'',sessionDone:'',sessionNote:'',weight:null};
+  bpState  = {systolic:null,diastolic:null,pulse:null,time_of_day:'morning'};
   // Reset form visuals
   document.getElementById('etoh-val').textContent = '0';
   document.getElementById('caf-val').textContent  = '0';
@@ -2913,12 +3115,17 @@ function switchLogDate(offset) {
   toggleAcuity(false);
   ['meal-clean','meal-mostly','meal-offplan']
     .forEach(id => { const el=document.getElementById(id); if(el) el.className='tog-btn'; });
+  ['protein-hit','protein-close','protein-missed']
+    .forEach(id => { const el=document.getElementById(id); if(el) el.className='tog-btn'; });
+  ['bp-sys','bp-dia','bp-pulse']
+    .forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  setBPTime('morning');
+  const bpFlag = document.getElementById('bp-flag-inline'); if(bpFlag) bpFlag.style.display='none';
   // Highlight active date pill
   [0,1,2,3].forEach(i => {
     const el = document.getElementById(i===0?'log-date-today':`log-date-${i}`);
     if(el) el.className = 'tog-btn' + (i===offset?' active act-blue':'');
   });
-  // Load that date's data
   populateLogForm(logTargetDate());
   updateLogDateSub();
   renderWeightTrend();
@@ -2942,6 +3149,23 @@ function setMeal(val) {
   Object.entries(map).forEach(([k,{id,cls}]) => {
     const b = document.getElementById(id);
     if(b) b.className = 'tog-btn' + (logState.meals === k ? ' '+cls : '');
+  });
+}
+
+function setProtein(val) {
+  logState.protein = logState.protein === val ? '' : val;
+  const map = { hit:'act-green', close:'act-yellow', missed:'act-red' };
+  ['hit','close','missed'].forEach(k => {
+    const b = document.getElementById('protein-' + k);
+    if(b) b.className = 'tog-btn' + (logState.protein === k ? ' ' + map[k] : '');
+  });
+}
+
+function setBPTime(tod) {
+  bpState.time_of_day = tod;
+  ['morning','afternoon','evening'].forEach(t => {
+    const el = document.getElementById('bp-time-' + t);
+    if(el) el.className = 'tog-btn' + (t === tod ? ' act-blue' : '');
   });
 }
 
@@ -3022,6 +3246,21 @@ function clearSessionNote() {
   if(acuityNote) acuityNote.value = '';
   const acuityWrap = document.getElementById('acuity-note-wrap');
   if(acuityWrap) acuityWrap.style.display = 'none';
+
+  // Protein
+  logState.protein = '';
+  ['hit','close','missed'].forEach(k => {
+    const b = document.getElementById('protein-' + k); if(b) b.className = 'tog-btn';
+  });
+
+  // BP
+  bpState = { systolic:null, diastolic:null, pulse:null, time_of_day:'morning' };
+  ['bp-sys','bp-dia','bp-pulse'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.value = '';
+  });
+  setBPTime('morning');
+  const bpFlag = document.getElementById('bp-flag-inline');
+  if(bpFlag) bpFlag.style.display = 'none';
 }
 
 function saveLog() {
@@ -3034,7 +3273,33 @@ function saveLog() {
   const entry = {...logState, date:logTargetDate(), savedAt:new Date().toISOString()};
   S.setJSON('log_' + logTargetDate(), entry);
 
-  // Flash saved indicator
+  // BP — save separately if values entered
+  const sys   = parseInt(document.getElementById('bp-sys')?.value)   || null;
+  const dia   = parseInt(document.getElementById('bp-dia')?.value)   || null;
+  const pulse = parseInt(document.getElementById('bp-pulse')?.value) || null;
+  if(sys && dia) {
+    saveBPLog(logTargetDate(), { systolic:sys, diastolic:dia, pulse, time_of_day:bpState.time_of_day });
+    const flagEl = document.getElementById('bp-flag-inline');
+    if(flagEl) {
+      if(sys >= 140 || dia >= 90) {
+        flagEl.style.cssText = 'display:block;margin-top:8px;font-size:12px;font-weight:700;padding:6px 10px;border-radius:8px;line-height:1.4;background:var(--lift-tint);color:var(--lift)';
+        flagEl.textContent = '⚠️ Stage 2 — systolic ≥140 or diastolic ≥90. Discuss with your doctor.';
+      } else if(sys >= 130 || dia >= 80) {
+        flagEl.style.cssText = 'display:block;margin-top:8px;font-size:12px;font-weight:700;padding:6px 10px;border-radius:8px;line-height:1.4;background:var(--cardio-tint);color:#c8b400';
+        flagEl.textContent = '⚠️ Elevated — systolic ≥130 or diastolic ≥80.';
+      } else {
+        flagEl.style.display = 'none';
+      }
+    }
+    renderBPCard();
+  }
+
+  // Push session note to rolling notes (max 4)
+  if(logState.sessionNote) {
+    const slog = S.getJSON('session_log_' + logTargetDate());
+    pushSessionNote({ date:logTargetDate(), note:logState.sessionNote, session:slog?.dayName || '' });
+  }
+
   const chip = document.getElementById('log-saved-chip');
   if(chip){ chip.style.display='block'; setTimeout(()=>chip.style.display='none',2500); }
   showToast('Log saved ✓');
@@ -3045,14 +3310,15 @@ function saveLog() {
 
 function populateLogForm(dateStr) {
   const existing = loadLifestyleLog(dateStr);
-  if(!existing) return;
+  if(!existing) { updateSessionLoggedStatus(); return; }
   logState = {...logState, ...existing};
   const etohEl = document.getElementById('etoh-val'); if(etohEl) etohEl.textContent = logState.etoh||0;
   const cafEl  = document.getElementById('caf-val');  if(cafEl)  cafEl.textContent  = logState.caffeineCups||0;
   const cafT   = document.getElementById('caf-time'); if(cafT)   cafT.value         = logState.caffeineTime||'';
   const wEl    = document.getElementById('weight-input');
   if(wEl && logState.weight) wEl.value = logState.weight;
-  if(logState.meals) setMeal(logState.meals);
+  if(logState.meals)   setMeal(logState.meals);
+  if(logState.protein) setProtein(logState.protein);
   updateSessionLoggedStatus();
   const acuityToggle = document.getElementById('acuity-toggle');
   if(acuityToggle) acuityToggle.checked = logState.highAcuity;
@@ -3061,6 +3327,15 @@ function populateLogForm(dateStr) {
   if(acuityNote) acuityNote.value = logState.acuityNote||'';
   const sessionNote = document.getElementById('session-note-input');
   if(sessionNote) sessionNote.value = logState.sessionNote||'';
+  // BP
+  const bp = getBPLog(dateStr);
+  if(bp) {
+    const sEl = document.getElementById('bp-sys');   if(sEl)  sEl.value  = bp.systolic  || '';
+    const dEl = document.getElementById('bp-dia');   if(dEl)  dEl.value  = bp.diastolic || '';
+    const pEl = document.getElementById('bp-pulse'); if(pEl)  pEl.value  = bp.pulse     || '';
+    setBPTime(bp.time_of_day || 'morning');
+    bpState = { systolic:bp.systolic, diastolic:bp.diastolic, pulse:bp.pulse, time_of_day:bp.time_of_day||'morning' };
+  }
 }
 
 function updateLogDateSub() {
@@ -3174,10 +3449,8 @@ function notePeriod() {
   if(h < 5)   return null; // overnight — no note yet
 
   const snap      = sheetDataGlobal?.snap || {};
-  const row       = sheetDataGlobal?.todayRow || {};
-  const yRow      = (sheetDataGlobal?.daily || []).find(r => r.date === offsetISO(-1)) || {};
-  const hasBBWake = parseFloat(snap.bb_wake) || parseFloat(yRow.bb_wake) || parseFloat(row.bb_wake);
-  const hasSleep  = parseFloat(snap.sleep_hrs) || parseFloat(row.sleep_hrs);
+  const hasBBWake = parseFloat(snap.bb_wake);
+  const hasSleep  = parseFloat(snap.sleep_hrs);
 
   // Both ready — generate morning note
   if(hasBBWake && hasSleep) return 'morning';
@@ -3203,10 +3476,163 @@ function isMorningPeriod(period) {
   return period && period.startsWith('morning');
 }
 
-function buildCoachingContext(data) {
-  const row  = data?.todayRow  || {};
-  const snap = data?.snap      || {};
-  const acts = data?.activityLog || [];
+// ══════════════════════════════════════════════════════════
+//  FLAGS
+// ══════════════════════════════════════════════════════════
+
+function computeFlags(snap, daily) {
+  const flags = [];
+  const n = v => { const x = parseFloat(v); return isNaN(x) ? null : x; };
+
+  const bb    = n(snap.bb_wake);
+  const hrv   = n(snap.hrv_rmssd);
+  const sleep = n(snap.sleep_hrs);
+  const sleepScore = n(snap.sleep_score);
+  const rhr   = n(snap.resting_hr);
+  const tr    = n(snap.training_readiness);
+  const ts    = n(snap.training_status_num ?? snap.training_status);
+
+  // 1. Low wake BB
+  if(bb !== null && bb < 35)
+    flags.push({ key:'low_bb', label:'Low wake BB', severity:'red', value:bb });
+
+  // 2. Low HRV
+  if(hrv !== null && hrv < 40)
+    flags.push({ key:'low_hrv', label:'Low HRV', severity: hrv < 30 ? 'red' : 'amber', value:hrv });
+
+  // 3. Short sleep
+  if(sleep !== null && sleep < 6)
+    flags.push({ key:'short_sleep', label:'Short sleep', severity: sleep < 5 ? 'red' : 'amber', value:sleep });
+
+  // 4. Low sleep score
+  if(sleepScore !== null && sleepScore < 60)
+    flags.push({ key:'low_sleep_score', label:'Poor sleep score', severity:'amber', value:sleepScore });
+
+  // 5. Elevated resting HR
+  if(rhr !== null && rhr > 65)
+    flags.push({ key:'elevated_rhr', label:'Elevated RHR', severity: rhr > 72 ? 'red' : 'amber', value:rhr });
+
+  // 6. SpO2 accumulator — 3+ nights flagged
+  const spo2Days = (daily || []).slice(0, 14).filter(r => {
+    const v = n(r.avg_spo2 ?? r.spo2_avg);
+    return v !== null && v < 95;
+  }).length;
+  if(spo2Days >= 3)
+    flags.push({ key:'spo2_concern', label:`SpO2 <95% on ${spo2Days} of last 14 nights`, severity: spo2Days >= 6 ? 'red' : 'amber', value:spo2Days });
+
+  // 7. BP elevated (most recent reading)
+  const bpLogs = getAllBPLogs();
+  if(bpLogs.length) {
+    const latest = bpLogs[0];
+    if((latest.systolic >= 140 || latest.diastolic >= 90))
+      flags.push({ key:'bp_stage2', label:`BP Stage 2: ${latest.systolic}/${latest.diastolic}`, severity:'red' });
+    else if((latest.systolic >= 130 || latest.diastolic >= 80))
+      flags.push({ key:'bp_elevated', label:`BP elevated: ${latest.systolic}/${latest.diastolic}`, severity:'amber' });
+  }
+
+  // 8. High acuity shift yesterday or today
+  const todayLog = loadLifestyleLog(todayISO()) || {};
+  const yLog     = loadLifestyleLog(offsetISO(-1)) || {};
+  if(todayLog.highAcuity || yLog.highAcuity)
+    flags.push({ key:'high_acuity', label:'High-acuity shift recent', severity:'amber' });
+
+  // 9. Alcohol last night
+  if((yLog.etoh || 0) >= 2)
+    flags.push({ key:'etoh', label:`${yLog.etoh} drinks last night`, severity: yLog.etoh >= 4 ? 'red' : 'amber', value:yLog.etoh });
+
+  // 10. Overreaching training status
+  if(ts !== null && ts <= 1)
+    flags.push({ key:'overreaching', label:'Training status: overreaching', severity:'red', value:ts });
+
+  // 11. Low training readiness
+  if(tr !== null && tr < 40)
+    flags.push({ key:'low_tr', label:'Low training readiness', severity: tr < 25 ? 'red' : 'amber', value:tr });
+
+  return flags;
+}
+
+// ══════════════════════════════════════════════════════════
+//  SpO2 ACCUMULATOR
+// ══════════════════════════════════════════════════════════
+
+function renderSpo2Accum(daily) {
+  const line = document.getElementById('spo2-accum-line');
+  if(!line) return;
+  const n = v => { const x = parseFloat(v); return isNaN(x) ? null : x; };
+  const flagged = (daily || []).slice(0, 14).filter(r => {
+    const v = n(r.avg_spo2 ?? r.spo2_avg);
+    return v !== null && v < 95;
+  });
+  if(flagged.length < 3) { line.style.display = 'none'; return; }
+  const color = flagged.length >= 6 ? 'var(--red)' : 'var(--yellow)';
+  line.style.display = 'block';
+  line.style.color   = color;
+  line.innerHTML = `⚠️ SpO₂ &lt;95% on <strong>${flagged.length}</strong> of last 14 nights`;
+}
+
+// ══════════════════════════════════════════════════════════
+//  BP TREND CARD
+// ══════════════════════════════════════════════════════════
+
+function renderBPCard() {
+  const card = document.getElementById('bp-trend-card');
+  if(!card) return;
+  const logs = getAllBPLogs();
+  if(logs.length < 3) { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+
+  const latest = logs[0];
+  document.getElementById('bp-latest-reading').textContent =
+    `${latest.systolic}/${latest.diastolic}`;
+  const pulseEl = document.getElementById('bp-latest-pulse');
+  if(pulseEl) pulseEl.textContent = latest.pulse ? `${latest.pulse} bpm` : '';
+  const timeEl = document.getElementById('bp-latest-time');
+  if(timeEl) {
+    const d = new Date(latest.saved_at || latest.date);
+    timeEl.textContent = latest.time_of_day ? latest.time_of_day.charAt(0).toUpperCase() + latest.time_of_day.slice(1)
+      + ' · ' + latest.date : latest.date;
+  }
+
+  // Badge
+  const badge = document.getElementById('bp-class-badge');
+  if(badge) {
+    const s = latest.systolic, d2 = latest.diastolic;
+    let label, color;
+    if(s >= 180 || d2 >= 120)      { label = 'Crisis';      color = '#FF0040'; }
+    else if(s >= 140 || d2 >= 90)  { label = 'Stage 2 HTN'; color = 'var(--red)'; }
+    else if(s >= 130 || d2 >= 80)  { label = 'Stage 1 HTN'; color = 'var(--yellow)'; }
+    else if(s >= 120 && d2 < 80)   { label = 'Elevated';    color = 'var(--yellow)'; }
+    else                            { label = 'Normal';      color = 'var(--green)'; }
+    badge.innerHTML = `<span style="font-size:12px;font-weight:700;color:${color};background:${color}22;padding:3px 10px;border-radius:20px">${label}</span>`;
+  }
+
+  // Spark bars — up to 14 days of systolic
+  const spark  = document.getElementById('bp-spark');
+  if(spark) {
+    const recent = logs.slice(0, 14).reverse();
+    const sysVals = recent.map(r => r.systolic);
+    const maxS = Math.max(...sysVals, 140);
+    const minS = Math.min(...sysVals, 110);
+    const range = maxS - minS || 1;
+    spark.innerHTML = sysVals.map((v, i) => {
+      const pct  = ((v - minS) / range * 80 + 10).toFixed(1);
+      const col  = v >= 140 ? 'var(--red)' : v >= 130 ? 'var(--yellow)' : 'var(--green)';
+      const isLatest = i === sysVals.length - 1;
+      return `<div style="flex:1;height:${pct}%;background:${col};border-radius:2px 2px 0 0;opacity:${isLatest?1:0.65}"></div>`;
+    }).join('');
+  }
+
+  // Footer
+  const footer = document.getElementById('bp-readings-footer');
+  if(footer) {
+    const avg = v => Math.round(logs.slice(0,7).reduce((a,r)=>a+(r[v]||0),0)/Math.min(logs.length,7));
+    footer.textContent = `7-day avg: ${avg('systolic')}/${avg('diastolic')} · ${logs.length} readings`;
+  }
+}
+
+function buildAIContext(data) {
+  const snap = data?.snap || {};
+  const acts = data?.activities || [];
   const idx  = getCycleIdx();
   const day  = DAYS[idx];
   const bb   = wakeBB ?? currentBB; // wake BB drives all training recommendations
@@ -3266,22 +3692,19 @@ function buildCoachingContext(data) {
     sessionShiftNote   = `NOTE: Nicholas deliberately moved ${doneDay.name} (Day ${doneDay.num}) to today instead of scheduled ${scheduledDay.name} (Day ${scheduledDay.num}) — intentional 48/96 scheduling, not an error.`;
   }
 
-  // ── Metrics ────────────────────────────────────────────────
-  // bb_wake for today lives in yesterday's daily log row by design (date offset).
-  // Prefer snap.bb_wake (live snapshot), then yesterday's daily row, then todayRow as last resort.
-  const yesterdayDailyRow = (data.daily || []).find(r => r.date === offsetISO(-1)) || {};
-  const bbWake    = parseFloat(snap.bb_wake) || parseFloat(yesterdayDailyRow.bb_wake) || parseFloat(row.bb_wake) || null;
-  const bbCurrent = bb || parseFloat(snap.bb_current) || null;
-  const hrv       = parseFloat(snap.hrv_ms)     || parseFloat(row.hrv_ms)     || null;
-  const sleepHrs  = parseFloat(snap.sleep_hrs)  || parseFloat(row.sleep_hrs)  || null;
-  const sleepScore= parseFloat(snap.sleep_score)|| parseFloat(row.sleep_score)|| null;
-  const deepMin   = parseFloat(snap.deep_min)   || parseFloat(row.deep_min)   || null;
-  const remMin    = parseFloat(snap.rem_min)    || parseFloat(row.rem_min)    || null;
-  const readiness = snap.training_readiness || row.training_readiness || '—';
-  const status    = snap.training_status    || row.training_status    || '—';
-  const vo2       = row.vo2_max || snap.vo2_max || '—';
-  const restHR    = snap.resting_hr || row.resting_hr || '—';
-  const stress    = snap.avg_stress || row.avg_stress  || '—';
+  // ── Metrics — snapshot only ────────────────────────────────
+  const bbWake    = parseFloat(snap.bb_wake)           || null;
+  const bbCurrent = bb || parseFloat(snap.bb_current)  || null;
+  const hrv       = parseFloat(snap.hrv_ms)            || null;
+  const sleepHrs  = parseFloat(snap.sleep_hrs)         || null;
+  const sleepScore= parseFloat(snap.sleep_score)       || null;
+  const deepMin   = parseFloat(snap.deep_min)          || null;
+  const remMin    = parseFloat(snap.rem_min)           || null;
+  const readiness = snap.training_readiness            || '—';
+  const status    = snap.training_status               || '—';
+  const restHR    = snap.resting_hr                    || '—';
+  const stress    = snap.avg_stress                    || '—';
+  const vo2       = snap.vo2_max                       || '—';
 
   const noWakeFlag  = !bbWake   ? ' ⚠️ Wake BB unavailable.' : '';
   const noSleepFlag = !sleepHrs ? ' ⚠️ Sleep data not yet available.' : '';
@@ -3433,6 +3856,25 @@ function buildCoachingContext(data) {
   const weeklySummary = getWeeklySummary();
   const blockAdh    = getBlockAdherence();
 
+  // ── Flags ──────────────────────────────────────────────────
+  const flags = computeFlags(snap, data.daily || []);
+  const flagStr = flags.length
+    ? flags.map(f => `[${f.severity.toUpperCase()}] ${f.label}`).join(', ')
+    : 'None';
+
+  // ── Plan layer ─────────────────────────────────────────────
+  const plan = getPlan();
+  const planStr = [
+    plan.week_intent ? `Week intent: ${plan.week_intent}` : '',
+    ...Object.entries(plan.session_overrides || {}).map(([d2, v]) => `Override ${d2}: ${v}`)
+  ].filter(Boolean).join(' | ') || 'None';
+
+  // ── Rolling session notes ──────────────────────────────────
+  const rollingNotes = getSessionNotes();
+  const notesStr = rollingNotes.length
+    ? rollingNotes.map(n => `[${n.date}${n.session?' · '+n.session:''}] ${n.note}`).join(' | ')
+    : 'None';
+
   return {
     profile: `Nicholas — 39yo firefighter, Pearland TX, 48/96 shift. ~235 lbs, down ~60 lbs. Recomping. Chronic sleep deficit ~2h20min for 12+ months. HRV baseline 27–30ms (33ms+ strong, under 25ms flag). BB rarely exceeds 65. No overhead pressing — floor press is the permanent substitute. Wife also firefighter on 48/96 starting day after Nicholas — always on shift Nicholas's Cycle Day 3, home from Day 4 morning. Solo parenting Cycle Day 3. Kids in daycare M/W/F 0830–1445. Backup support occasionally available.`,
 
@@ -3454,62 +3896,72 @@ Recommendation: "${tomorrowRule.opt}" — ${tomorrowRule.desc}`,
     yesterdayActs: `Yesterday's activities: ${formatActs(getActsForDate(offsetISO(-1)))}`,
     liftWeights:   `Lift A: ${liftWeightStr('liftA')}. Lift B: ${liftWeightStr('liftB')}.`,
     liftHistory:   getLiftHistory(),
+    flags:         flagStr,
+    plan:          planStr,
+    sessionNotes:  notesStr,
   };
 }
 
-async function generateCoachingNote(forceRefresh = false) {
+async function generateDailyBrief(forceRefresh = false) {
   const period  = notePeriod();
   const textEl  = document.getElementById('coaching-text');
   const labelEl = document.getElementById('coaching-label');
 
-  // Overnight — no note yet
   if(!period) {
     if(labelEl) labelEl.textContent = "Coach's Note";
     if(textEl)  textEl.innerHTML = `<span style="font-size:13px;color:var(--text3)">Morning note arrives once Garmin logs your wake.</span>`;
     return;
   }
 
-  // Waiting — filler message, no API call
   if(period === 'waiting') {
-    const snap      = sheetDataGlobal?.snap || {};
-    const row       = sheetDataGlobal?.todayRow || {};
-    const yRow      = (sheetDataGlobal?.daily || []).find(r => r.date === offsetISO(-1)) || {};
-    const hasBBWake = parseFloat(snap.bb_wake) || parseFloat(yRow.bb_wake) || parseFloat(row.bb_wake);
-    const hasSleep  = parseFloat(snap.sleep_hrs) || parseFloat(row.sleep_hrs);
-    const missing   = [!hasBBWake && 'wake BB', !hasSleep && 'sleep data'].filter(Boolean).join(' & ');
-    if(labelEl) labelEl.textContent = "Morning Note";
+    const snap2   = sheetDataGlobal?.snap || {};
+    const missing = [!parseFloat(snap2.bb_wake) && 'wake BB', !parseFloat(snap2.sleep_hrs) && 'sleep data'].filter(Boolean).join(' & ');
+    if(labelEl) labelEl.textContent = 'Morning Note';
     if(textEl)  textEl.innerHTML = `
       <span style="font-size:13px;color:var(--text3)">Waiting for ${missing} from Garmin…</span>
-      <button onclick="loadSheetData().then(()=>generateCoachingNote())" style="margin-left:10px;background:none;border:1px solid var(--border2);color:var(--text2);border-radius:6px;padding:2px 8px;font-size:11px;cursor:pointer">↻ Check</button>`;
+      <button onclick="loadAllSheetData().then(d=>{sheetDataGlobal=d;generateDailyBrief();})" style="margin-left:10px;background:none;border:1px solid var(--border2);color:var(--text2);border-radius:6px;padding:2px 8px;font-size:11px;cursor:pointer">↻ Check</button>`;
     return;
   }
 
   const key    = noteKey(period);
   const cached = S.getJSON(key);
-
-  // Show cached — generate once per period per day, no regeneration
   if(cached && !forceRefresh) {
-    renderCoachingNote(cached.text, cached.generatedAt, period, true);
+    renderBriefResponse(cached, cached.generatedAt, period, true);
     return;
   }
 
-  // Loading state
   if(textEl) textEl.innerHTML = `
     <div class="skeleton" style="width:100%;height:13px"></div>
     <div class="skeleton" style="width:85%;height:13px;margin-top:6px"></div>
     <div class="skeleton" style="width:60%;height:13px;margin-top:6px"></div>`;
 
-  const data      = sheetDataGlobal;
-  const ctx       = buildCoachingContext(data);
-  const isNoWake  = period === 'morning_no_wake' || period === 'morning_no_wake_no_sleep';
-  const isNoSleep = period === 'morning_no_sleep' || period === 'morning_no_wake_no_sleep';
-  const isMorning = isMorningPeriod(period);
+  const ctx      = buildAIContext(sheetDataGlobal);
+  const isMorn   = isMorningPeriod(period);
+  const isNoWake = period.includes('no_wake');
+  const isNoSlp  = period.includes('no_sleep');
 
-  const systemPrompt = isMorning
-    ? `You are Nicholas's personal fitness coach — you know him well. He's 39, a firefighter, down 60 lbs and recomping, carrying a chronic sleep deficit of ~2h20min that has been going on for 12+ months. His HRV baseline is 27–30ms; 33ms+ is a strong day, under 25ms is a flag. His BB rarely exceeds 65 — treat 45+ as decent, 55+ as strong, under 35 as a hard skip trigger. Write a direct, personal 3–4 sentence morning note. Lead with sleep quality: score, hours, deep and REM minutes — tell him what they mean for today's capacity, not just what they are (e.g. low deep = muscular recovery compromised; low REM = cognitive/mood impact). Then give BB and HRV in one sentence with a direct read on whether he's primed to push or needs to manage load. Follow with today's specific session — if TODAY's session note mentions a shift plan (e.g. "shifting Lift B to today", "doing Lift A instead"), treat that as the primary recommendation and endorse it over the default cycle activity, unless a metric is a hard warning against it (BB under 35 for lifts, HRV crash). Also use the lift history to flag if a lift is overdue and today is a good window to fit it in. If it's a lift day, reference goal weights without listing the numbers (Session tab shows them). Close with one sharp, non-generic action tied to the data — shift context, tomorrow's demands, or a specific recovery lever he can pull today. No motivational filler. Write like you've been coaching him for months.${isNoWake ? ' Wake BB unavailable — use readiness and HRV to assess recovery instead; do not reference wake BB as if it exists.' : ''}${isNoSleep ? ' Sleep data unavailable — do not reference sleep score or hours as if they exist.' : ''}`
-    : `You are Nicholas's personal fitness coach — you know him and his life. He's a firefighter on a 48/96 rotation with a wife on the same schedule, young kids, family obligations, and a real life outside training. Missed or skipped sessions happen for legitimate reasons — manual labor, family projects, shift demands, life. Never open with judgment. If a session was skipped or nothing is logged, assume there was a good reason and treat unlogged physical work (yard work, manual labor, helping family) as real exertion. Keep your total response under 400 tokens. Write 4 sentences: (1) Assess today — if a session was done, acknowledge it and note whether the load fit his state; if skipped or unlogged, acknowledge what he likely did instead and frame it as valid recovery context, not failure. (2) Name the single biggest recovery factor for tonight based on the actual data — BB level, alcohol, stress, or sleep debt — and state specifically what it means for tomorrow's numbers, not generically. (3) Give tomorrow's session and the BB threshold that determines full vs. modified option; if today's scheduled session was skipped, note whether it can be shifted to tomorrow or another open slot this cycle. (4) One concrete recovery action for tonight tied to his shift status and home situation. If block adherence is under 60% logged, add one sentence — calm, not critical — identifying the highest-priority session left in the cycle and the best window to fit it. Tone: encouraging, data-grounded, like a coach who knows his life isn't just training.`;
+  const systemPrompt = `You are Nicholas's personal fitness coach. You know him well — 39yo firefighter, 48/96 rotation, down 60 lbs, recomping, chronic sleep deficit. HRV baseline 27–30ms. BB rarely exceeds 65.
+
+Respond ONLY with valid JSON — no markdown fences, no prose outside the JSON. Schema:
+{
+  "headline": "string — 1 sentence, 10-15 words summarising his state right now",
+  "note": "string — ${isMorn ? '3-4 sentence morning coaching note' : '4 sentence evening coaching note'}",
+  "session_call": "string — 1 sentence: exactly what to do for today's session and why",
+  "tomorrow_flag": "string — 1 sentence: the single most important thing to know about tomorrow",
+  "recovery_action": "string — 1 sentence: the one specific recovery lever to pull today"
+}
+
+${isMorn
+  ? `Morning note rules: Lead with sleep quality (score, hours, deep, REM) and what they mean for capacity. One sentence on BB + HRV with a clear read on load capacity. Follow with today's session — honour any session note override unless BB < 35 (lifts) or HRV crashed. Close with a sharp, data-tied action.${isNoWake ? ' Wake BB unavailable — use readiness/HRV instead, do not reference wake BB.' : ''}${isNoSlp ? ' Sleep data unavailable — do not reference sleep score or hours as fact.' : ''}`
+  : `Evening note rules: Never open with judgment on skipped sessions. Assess today first, then name the single biggest recovery factor for tonight, then preview tomorrow's session + BB threshold, then one concrete recovery action tied to shift status.`}
+
+No motivational filler. No generic advice. Write like you have been coaching him for months.`;
 
   const userMsg = `${ctx.profile}
+
+FLAGS: ${ctx.flags}
+PLAN: ${ctx.plan}
+SESSION NOTES (last 4): ${ctx.sessionNotes}
 
 METRICS: ${ctx.metrics}
 
@@ -3529,22 +3981,39 @@ LIFT HISTORY: ${ctx.liftHistory}
 PRINCIPLE: Body Battery over schedule. Sleep over training. Longevity is the goal.`;
 
   try {
-    const text = await askClaude(systemPrompt, userMsg, isMorning ? 350 : 400);
-    S.setJSON(key, {text, generatedAt: new Date().toISOString(), period});
-    renderCoachingNote(text, new Date().toISOString(), isMorning ? 'morning' : period, false);
+    const raw  = await askClaude(systemPrompt, userMsg, 500);
+    let parsed;
+    try {
+      const clean = raw.replace(/^```[\w]*\n?/,'').replace(/```$/,'').trim();
+      parsed = JSON.parse(clean);
+    } catch(e) {
+      parsed = { headline:'', note: raw, session_call:'', tomorrow_flag:'', recovery_action:'' };
+    }
+    parsed.generatedAt = new Date().toISOString();
+    parsed.period = period;
+    S.setJSON(key, parsed);
+    renderBriefResponse(parsed, parsed.generatedAt, period, false);
   } catch(e) {
-    console.error('Coaching note error:', e);
+    console.error('Brief error:', e);
     if(textEl) textEl.innerHTML = `<span style="color:var(--text3);font-size:13px">Could not generate note — ${e.message}</span>`;
   }
 }
 
-function renderCoachingNote(text, generatedAt, period, fromCache) {
-  const textEl   = document.getElementById('coaching-text');
-  const timeEl   = document.getElementById('coaching-time');
-  const labelEl  = document.getElementById('coaching-label');
-  if(textEl) textEl.innerHTML = `<div style="font-size:14px;line-height:1.65;color:var(--text2)">${text}</div>`;
+function renderBriefResponse(resp, generatedAt, period, fromCache) {
+  const textEl  = document.getElementById('coaching-text');
+  const timeEl  = document.getElementById('coaching-time');
+  const labelEl = document.getElementById('coaching-label');
 
-  if(labelEl) labelEl.textContent = period === 'morning' ? 'Morning Note' : 'Evening Note';
+  if(labelEl) labelEl.textContent = isMorningPeriod(period) ? 'Morning Brief' : 'Evening Brief';
+
+  if(textEl) {
+    const hl  = resp.headline      ? `<div style="font-size:13px;font-weight:700;color:var(--text1);margin-bottom:8px">${resp.headline}</div>` : '';
+    const note = resp.note         ? `<div style="font-size:14px;line-height:1.65;color:var(--text2);margin-bottom:10px">${resp.note}</div>` : '';
+    const sc  = resp.session_call  ? `<div style="font-size:12px;color:var(--green);margin-bottom:5px">💪 ${resp.session_call}</div>` : '';
+    const tf  = resp.tomorrow_flag ? `<div style="font-size:12px;color:var(--yellow);margin-bottom:5px">📅 ${resp.tomorrow_flag}</div>` : '';
+    const ra  = resp.recovery_action ? `<div style="font-size:12px;color:var(--blue)">🔋 ${resp.recovery_action}</div>` : '';
+    textEl.innerHTML = hl + note + sc + tf + ra;
+  }
 
   if(timeEl && generatedAt) {
     const d = new Date(generatedAt);
@@ -3552,7 +4021,6 @@ function renderCoachingNote(text, generatedAt, period, fromCache) {
     timeEl.textContent = fromCache ? `Generated at ${t}` : `Just generated · ${t}`;
     timeEl.style.display = 'block';
   }
-
 }
 
 // ══════════════════════════════════════════════════════════
@@ -3848,20 +4316,19 @@ async function init() {
   initLogTab();
   history.replaceState({page:'today'}, '', '');
 
+  renderPlanLayer();
+
   try {
     const data = await loadAllSheetData();
-    if(!data.todayRow && !data.snap) {
+    if(data.dataUnavailable) {
       showDataNote('⚠️ Could not load sheet data — check API key and sheet sharing settings.');
       return;
-    }
-    if(!data.todayRow) {
-      showDataNote('Sheet loaded — no complete daily row found yet. Showing live snapshot only.');
     }
     sheetDataGlobal = data;
     renderMetrics(data);
     renderSessionPage();
     renderTrends(data);
-    generateCoachingNote();
+    generateDailyBrief();
   } catch(e) {
     console.error('Init error:', e);
     showDataNote(`⚠️ Load failed — ${e.message}`);
