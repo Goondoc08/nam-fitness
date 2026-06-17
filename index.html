@@ -700,11 +700,12 @@ input:checked ~ .toggle-slider-orange::before{background:var(--orange);transform
   </div>
 
   <!-- Cycle + Week badges -->
-  <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+  <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
     <div class="badge badge-gray" id="cycle-badge">Day — of 6</div>
     <div class="badge badge-gray" id="week-badge">Week — of 12</div>
     <div class="badge badge-gray" id="shift-badge">—</div>
   </div>
+  <div id="off-work-strip" style="margin-bottom:12px"></div>
 
   <!-- Planning layer -->
   <div id="plan-layer" style="margin-bottom:12px"></div>
@@ -1468,6 +1469,82 @@ function pushSessionNote(entry) {
   S.setJSON('session_notes', notes.slice(0, 4));
 }
 
+// ── Off Work ──────────────────────────────────────────────
+function getOffWork()      { return S.getJSON('off_work'); }
+function setOffWork(until) { S.setJSON('off_work', { until }); }
+function clearOffWork()    { S.del('off_work'); }
+function isOffWork() {
+  const ow = getOffWork();
+  return !!(ow && todayISO() <= ow.until);
+}
+function isLastOffDay() {
+  const ow = getOffWork();
+  return !!(ow && todayISO() === ow.until);
+}
+function initOffWork() {
+  const ow = getOffWork();
+  if(ow && todayISO() > ow.until) clearOffWork();
+}
+
+function renderOffWorkStrip() {
+  const strip      = document.getElementById('off-work-strip');
+  const shiftBadge = document.getElementById('shift-badge');
+  if(!strip) return;
+
+  if(isOffWork()) {
+    const ow    = getOffWork();
+    const d     = new Date(ow.until + 'T12:00:00');
+    const label = d.toLocaleDateString('en-US', { month:'short', day:'numeric' });
+    if(shiftBadge) {
+      shiftBadge.textContent = 'Off Work';
+      shiftBadge.className   = 'badge';
+      shiftBadge.style.cssText = 'background:rgba(255,152,0,.12);color:var(--orange);border:1px solid rgba(255,152,0,.3)';
+    }
+    strip.innerHTML = `<div style="display:flex;align-items:center;gap:8px;font-size:12px">
+      <span style="color:var(--text3)">Off until ${label}</span>
+      <button onclick="clearOffWorkAndRender()" style="font-size:11px;color:var(--text3);background:none;border:1px solid var(--border);border-radius:6px;padding:2px 8px;cursor:pointer">Clear</button>
+    </div>`;
+  } else {
+    if(shiftBadge) {
+      shiftBadge.className   = 'badge badge-gray';
+      shiftBadge.style.cssText = '';
+      shiftBadge.textContent = DAYS[todayCycleIdx]?.badge || '—';
+    }
+    strip.innerHTML = `
+      <button onclick="showOffWorkPanel()" style="font-size:11px;color:var(--text3);background:none;border:1px solid var(--border);border-radius:6px;padding:3px 10px;cursor:pointer">+ Set off-work period</button>
+      <div id="off-work-panel" style="display:none;margin-top:8px;padding:10px 12px;background:var(--bg2);border-radius:10px;border:1px solid var(--border)">
+        <div style="font-size:12px;color:var(--text2);margin-bottom:8px;font-weight:600">Back on shift</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="date" id="off-work-date" min="${todayISO()}" style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text1);padding:6px 10px;font-size:13px">
+          <button onclick="applyOffWork()" style="background:var(--green);color:#0D0F14;border:none;border-radius:8px;padding:6px 14px;font-size:13px;font-weight:700;cursor:pointer">Set</button>
+        </div>
+      </div>`;
+  }
+}
+
+function showOffWorkPanel() {
+  const panel = document.getElementById('off-work-panel');
+  if(panel) panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+}
+
+function applyOffWork() {
+  const d = document.getElementById('off-work-date');
+  if(!d?.value) { showToast('Pick a return date first'); return; }
+  setOffWork(d.value);
+  renderOffWorkStrip();
+  S.del('coaching_morning_' + todayISO());
+  S.del('coaching_evening_' + todayISO());
+  showToast('Off-work set ✓');
+}
+
+function clearOffWorkAndRender() {
+  clearOffWork();
+  renderOffWorkStrip();
+  S.del('coaching_morning_' + todayISO());
+  S.del('coaching_evening_' + todayISO());
+  showToast('Back on shift ✓');
+}
+
 // ── BP log ────────────────────────────────────────────────
 function getBPLog(dateStr) { return S.getJSON('bp_' + dateStr); }
 function saveBPLog(dateStr, entry) {
@@ -1827,6 +1904,8 @@ function trRec(v) {
 // ══════════════════════════════════════════════════════════
 //  RENDER STATIC UI
 // ══════════════════════════════════════════════════════════
+let todayCycleIdx = 0;
+
 function renderStaticUI() {
   // Greeting
   document.getElementById('greeting').textContent = `${getGreeting()}, Nicholas`;
@@ -1836,6 +1915,7 @@ function renderStaticUI() {
 
   // Cycle + week badges
   const idx  = getCycleIdx();
+  todayCycleIdx = idx;
   const day  = DAYS[idx];
   const week = getWeekNum();
 
@@ -1857,6 +1937,8 @@ function renderStaticUI() {
 
   // Session page sub
   document.getElementById('session-sub').textContent = `${day.name} · Day ${day.num} of 6`;
+
+  renderOffWorkStrip();
 }
 
 // ══════════════════════════════════════════════════════════
@@ -3896,6 +3978,18 @@ function buildAIContext(data) {
     ...Object.entries(plan.session_overrides || {}).map(([d2, v]) => `Override ${d2}: ${v}`)
   ].filter(Boolean).join(' | ') || 'None';
 
+  // ── Off Work override ──────────────────────────────────────
+  let offWorkCtx = '';
+  if(isOffWork()) {
+    const ow = getOffWork();
+    const ret = new Date(ow.until + 'T12:00:00');
+    ret.setDate(ret.getDate() + 1);
+    const retStr = ret.toLocaleDateString('en-US', { month:'short', day:'numeric' });
+    offWorkCtx = isLastOffDay()
+      ? `Nicholas is off work TODAY (last day). Returns to shift ${retStr}. Remove all station/shift/call-volume language. Evening note must flag the return to shift tomorrow.`
+      : `Nicholas is off work until ${ow.until} (inclusive). Returns to shift ${retStr}. Remove all station/shift/call-volume language. Reframe sessions around home/gym and flexible timing.`;
+  }
+
   // ── Rolling session notes ──────────────────────────────────
   const rollingNotes = getSessionNotes();
   const notesStr = rollingNotes.length
@@ -3926,6 +4020,7 @@ Recommendation: "${tomorrowRule.opt}" — ${tomorrowRule.desc}`,
     flags:         flagStr,
     plan:          planStr,
     sessionNotes:  notesStr,
+    offWorkCtx,
   };
 }
 
@@ -3969,27 +4064,35 @@ async function generateDailyBrief(forceRefresh = false) {
 
   const systemPrompt = `You are Nicholas's personal fitness coach. You know him well — 39yo firefighter, 48/96 rotation, down 60 lbs, recomping, chronic sleep deficit. HRV baseline 27–30ms. BB rarely exceeds 65.
 
-Respond ONLY with valid JSON — no markdown fences, no prose outside the JSON. Schema:
+Respond ONLY with valid JSON — no markdown fences, no prose outside the JSON.
+
+${isMorn ? `Morning schema:
 {
-  "headline": "string — 1 sentence, 10-15 words summarising his state right now",
-  "note": "string — ${isMorn ? '3-4 sentence morning coaching note' : '4 sentence evening coaching note'}",
-  "session_call": "string — 1 sentence: exactly what to do for today's session and why",
-  "tomorrow_flag": "string — 1 sentence: the single most important thing to know about tomorrow",
-  "recovery_action": "string — 1 sentence: the one specific recovery lever to pull today"
-}
+  "last_night": "1 sentence: sleep hours/score/REM/deep and what they mean for today",
+  "capacity": "1 sentence: HRV + BB verdict — physical and cognitive load read",
+  "today_session": "1 sentence: exactly what to do, where, when — weights if lifting",
+  "this_week": "1 sentence: week adherence context and current focus",
+  "tomorrow": "1 sentence: tomorrow session, shift context, key BB threshold",
+  "spo2_note": "1 sentence if SpO2 flag is active and actionable today, else empty string"
+}` : `Evening schema:
+{
+  "headline": "1 sentence: tonight's key state in 10-15 words",
+  "note": "3-4 sentences flowing prose: today recap → tonight's single biggest recovery lever → tomorrow preview with BB threshold → one concrete bedtime action",
+  "spo2_note": "1 sentence if SpO2 flag is active and actionable tonight, else empty string"
+}`}
 
 ${isMorn
-  ? `Morning note rules: Lead with sleep quality (score, hours, deep, REM) and what they mean for capacity. One sentence on BB + HRV with a clear read on load capacity. Follow with today's session — honour any session note override unless BB < 35 (lifts) or HRV crashed. IMPORTANT: If SESSION NOTES say he is off work, on leave, not on shift, or has a schedule change this week — that is a hard override of the shift-based schedule. Do NOT reference station, shift window, or call volume in session_call or the note. Instead, acknowledge the schedule change explicitly and reframe the session around home/gym availability and the extra recovery bandwidth (more time to sleep, train at any hour, no call interruptions). Close with a sharp, data-tied action.${isNoWake ? ' Wake BB unavailable — use readiness/HRV instead, do not reference wake BB.' : ''}${isNoSlp ? ' Sleep data unavailable — do not reference sleep score or hours as fact.' : ''}`
-  : `Evening note rules: Never open with judgment on skipped sessions. Assess today first, then name the single biggest recovery factor for tonight, then preview tomorrow's session + BB threshold, then one concrete recovery action tied to shift status. IMPORTANT: If SESSION NOTES say he is off work or has a schedule change — acknowledge it explicitly, remove shift-timing references, and factor in the extra recovery bandwidth for the coming days.`}
+  ? `Morning rules: last_night leads with the quality split (score, hours, deep, REM) and what it means — not just the numbers. capacity gives a clear load verdict. today_session is exact — name the movement, load, and location; if off work drop all station/shift/call refs and use home/gym framing. this_week is one sharp adherence read. tomorrow previews the session type and the key metric threshold. spo2_note: SpO2 is a known chronic issue — mention it only if there is a specific action for today; never explain the problem at length.${isNoWake ? ' Wake BB unavailable — use readiness/HRV instead.' : ''}${isNoSlp ? ' Sleep data unavailable — do not cite sleep score or hours as fact.' : ''}`
+  : `Evening rules: headline states his condition right now. note flows as prose — open with today's session outcome (no judgment on skipped sessions), name the single biggest recovery lever for tonight, preview tomorrow's session and BB threshold, close with one concrete bedtime action. If returning to shift tomorrow, call it out explicitly. spo2_note: only if actionable tonight, never a lengthy explanation.`}
 
 No motivational filler. No generic advice. Write like you have been coaching him for months.`;
 
-  const userMsg = `${ctx.profile}
+  const userMsg = `${ctx.offWorkCtx ? `🚫 SCHEDULE OVERRIDE — READ BEFORE ANYTHING ELSE: ${ctx.offWorkCtx}\n\n` : ''}${ctx.profile}
 
 FLAGS: ${ctx.flags}
 PLAN: ${ctx.plan}
 
-=== SESSION NOTES (read these first — they can override the schedule below) ===
+=== SESSION NOTES (can override the schedule below) ===
 ${ctx.sessionNotes}
 ===
 
@@ -4038,15 +4141,29 @@ function renderBriefResponse(resp, generatedAt, period, fromCache) {
   if(labelEl) labelEl.textContent = isMorningPeriod(period) ? 'Morning Brief' : 'Evening Brief';
 
   if(textEl) {
-    const hl  = resp.headline      ? `<div style="font-size:13px;font-weight:700;color:var(--text1);margin-bottom:8px">${resp.headline}</div>` : '';
-    const note = resp.note         ? `<div style="font-size:14px;line-height:1.65;color:var(--text2);margin-bottom:10px">${resp.note}</div>` : '';
-    const sc  = resp.session_call  ? `<div style="font-size:12px;color:var(--green);margin-bottom:5px">💪 ${resp.session_call}</div>` : '';
-    const tf  = resp.tomorrow_flag ? `<div style="font-size:12px;color:var(--yellow);margin-bottom:5px">📅 ${resp.tomorrow_flag}</div>` : '';
-    const ra  = resp.recovery_action ? `<div style="font-size:12px;color:var(--blue)">🔋 ${resp.recovery_action}</div>` : '';
-    const notesDebug = resp.sessionNotesUsed && resp.sessionNotesUsed !== 'None'
-      ? `<div style="font-size:10px;color:var(--text3);margin-top:10px;padding-top:8px;border-top:1px solid var(--border)">📝 Notes seen: ${resp.sessionNotesUsed}</div>`
-      : `<div style="font-size:10px;color:var(--text3);margin-top:10px;padding-top:8px;border-top:1px solid var(--border)">📝 No session notes on record</div>`;
-    textEl.innerHTML = hl + note + sc + tf + ra + notesDebug;
+    let html = '';
+    if(isMorningPeriod(period) && resp.last_night) {
+      // Morning callout format
+      const row = (icon, label, val) => val
+        ? `<div style="display:flex;gap:6px;margin-bottom:7px;font-size:13px;line-height:1.5"><span style="flex-shrink:0">${icon}</span><span><strong style="color:var(--text1)">${label}</strong> <span style="color:var(--text2)">${val}</span></span></div>`
+        : '';
+      html = row('🌙','Last night:', resp.last_night)
+           + row('⚡','Capacity:', resp.capacity)
+           + row('💪','Today:', resp.today_session)
+           + row('📊','This week:', resp.this_week)
+           + row('📅','Tomorrow:', resp.tomorrow);
+      if(resp.spo2_note) html += `<div style="font-size:11px;color:var(--text3);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">· ${resp.spo2_note}</div>`;
+    } else {
+      // Evening prose format (and legacy cached morning notes)
+      const hl   = resp.headline        ? `<div style="font-size:13px;font-weight:700;color:var(--text1);margin-bottom:8px">${resp.headline}</div>` : '';
+      const note = resp.note            ? `<div style="font-size:14px;line-height:1.65;color:var(--text2);margin-bottom:8px">${resp.note}</div>` : '';
+      const sc   = resp.session_call    ? `<div style="font-size:12px;color:var(--green);margin-bottom:5px">💪 ${resp.session_call}</div>` : '';
+      const tf   = resp.tomorrow_flag   ? `<div style="font-size:12px;color:var(--yellow);margin-bottom:5px">📅 ${resp.tomorrow_flag}</div>` : '';
+      const ra   = resp.recovery_action ? `<div style="font-size:12px;color:var(--blue);margin-bottom:5px">🔋 ${resp.recovery_action}</div>` : '';
+      const spo  = resp.spo2_note       ? `<div style="font-size:11px;color:var(--text3);margin-top:6px;padding-top:8px;border-top:1px solid var(--border)">· ${resp.spo2_note}</div>` : '';
+      html = hl + note + sc + tf + ra + spo;
+    }
+    textEl.innerHTML = html;
   }
 
   if(timeEl && generatedAt) {
@@ -4345,6 +4462,7 @@ function renderInsights(daily) {
 //  INIT
 // ══════════════════════════════════════════════════════════
 async function init() {
+  initOffWork();
   renderStaticUI();
   renderSessionPage();
   initLogTab();
