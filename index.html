@@ -3970,8 +3970,8 @@ Respond ONLY with valid JSON — no markdown fences, no prose outside the JSON. 
 }
 
 ${isMorn
-  ? `Morning note rules: Lead with sleep quality (score, hours, deep, REM) and what they mean for capacity. One sentence on BB + HRV with a clear read on load capacity. Follow with today's session — honour any session note override unless BB < 35 (lifts) or HRV crashed. If session notes mention schedule or lifestyle context (e.g. off work, extra rest days, vacation, solo parenting stretch), factor that into load and recovery recommendations — more recovery bandwidth means more latitude to push or an explicit nudge to bank extra sleep. Close with a sharp, data-tied action.${isNoWake ? ' Wake BB unavailable — use readiness/HRV instead, do not reference wake BB.' : ''}${isNoSlp ? ' Sleep data unavailable — do not reference sleep score or hours as fact.' : ''}`
-  : `Evening note rules: Never open with judgment on skipped sessions. Assess today first, then name the single biggest recovery factor for tonight, then preview tomorrow's session + BB threshold, then one concrete recovery action tied to shift status. If session notes mention schedule or lifestyle context (e.g. off work, extra rest days), factor that into the recovery and load recommendation for the coming days.`}
+  ? `Morning note rules: Lead with sleep quality (score, hours, deep, REM) and what they mean for capacity. One sentence on BB + HRV with a clear read on load capacity. Follow with today's session — honour any session note override unless BB < 35 (lifts) or HRV crashed. IMPORTANT: If SESSION NOTES say he is off work, on leave, not on shift, or has a schedule change this week — that is a hard override of the shift-based schedule. Do NOT reference station, shift window, or call volume in session_call or the note. Instead, acknowledge the schedule change explicitly and reframe the session around home/gym availability and the extra recovery bandwidth (more time to sleep, train at any hour, no call interruptions). Close with a sharp, data-tied action.${isNoWake ? ' Wake BB unavailable — use readiness/HRV instead, do not reference wake BB.' : ''}${isNoSlp ? ' Sleep data unavailable — do not reference sleep score or hours as fact.' : ''}`
+  : `Evening note rules: Never open with judgment on skipped sessions. Assess today first, then name the single biggest recovery factor for tonight, then preview tomorrow's session + BB threshold, then one concrete recovery action tied to shift status. IMPORTANT: If SESSION NOTES say he is off work or has a schedule change — acknowledge it explicitly, remove shift-timing references, and factor in the extra recovery bandwidth for the coming days.`}
 
 No motivational filler. No generic advice. Write like you have been coaching him for months.`;
 
@@ -3979,7 +3979,10 @@ No motivational filler. No generic advice. Write like you have been coaching him
 
 FLAGS: ${ctx.flags}
 PLAN: ${ctx.plan}
-SESSION NOTES (last 4): ${ctx.sessionNotes}
+
+=== SESSION NOTES (read these first — they can override the schedule below) ===
+${ctx.sessionNotes}
+===
 
 METRICS: ${ctx.metrics}
 
@@ -4009,6 +4012,7 @@ PRINCIPLE: Body Battery over schedule. Sleep over training. Longevity is the goa
     }
     parsed.generatedAt = new Date().toISOString();
     parsed.period = period;
+    parsed.sessionNotesUsed = ctx.sessionNotes;
     S.setJSON(key, parsed);
     renderBriefResponse(parsed, parsed.generatedAt, period, false);
   } catch(e) {
@@ -4030,7 +4034,10 @@ function renderBriefResponse(resp, generatedAt, period, fromCache) {
     const sc  = resp.session_call  ? `<div style="font-size:12px;color:var(--green);margin-bottom:5px">💪 ${resp.session_call}</div>` : '';
     const tf  = resp.tomorrow_flag ? `<div style="font-size:12px;color:var(--yellow);margin-bottom:5px">📅 ${resp.tomorrow_flag}</div>` : '';
     const ra  = resp.recovery_action ? `<div style="font-size:12px;color:var(--blue)">🔋 ${resp.recovery_action}</div>` : '';
-    textEl.innerHTML = hl + note + sc + tf + ra;
+    const notesDebug = resp.sessionNotesUsed && resp.sessionNotesUsed !== 'None'
+      ? `<div style="font-size:10px;color:var(--text3);margin-top:10px;padding-top:8px;border-top:1px solid var(--border)">📝 Notes seen: ${resp.sessionNotesUsed}</div>`
+      : `<div style="font-size:10px;color:var(--text3);margin-top:10px;padding-top:8px;border-top:1px solid var(--border)">📝 No session notes on record</div>`;
+    textEl.innerHTML = hl + note + sc + tf + ra + notesDebug;
   }
 
   if(timeEl && generatedAt) {
