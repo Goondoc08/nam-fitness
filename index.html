@@ -707,9 +707,6 @@ input:checked ~ .toggle-slider-orange::before{background:var(--orange);transform
   </div>
   <div id="off-work-strip" style="margin-bottom:12px"></div>
 
-  <!-- Planning layer -->
-  <div id="plan-layer" style="margin-bottom:12px"></div>
-
   <!-- Export nudge -->
   <div class="export-nudge" id="export-nudge" style="display:none">
     <div class="export-nudge-text">📤 New month — export your data for deeper analysis in Claude</div>
@@ -1453,13 +1450,7 @@ function getSheetsKey()     { return S.get('sheets_key') || ''; }
 function getSheetId()       { return S.get('sheet_id') || SHEET_ID_DEFAULT; }
 function getWeightTarget()  { return S.get('weight_target') || ''; }
 
-// ── Planning layer ─────────────────────────────────────────
-function getPlan() {
-  return S.getJSON('plan_current') || { week_intent:'', session_overrides:{}, updated_at:'' };
-}
-function savePlan(plan) {
-  S.setJSON('plan_current', {...plan, updated_at: new Date().toISOString()});
-}
+
 
 // ── Rolling session notes (max 4) ─────────────────────────
 function getSessionNotes() { return S.getJSON('session_notes') || []; }
@@ -1568,116 +1559,6 @@ function getMedical() {
   };
 }
 function saveMedical(data) { S.setJSON('medical', data); }
-
-// ══════════════════════════════════════════════════════════
-//  PLANNING LAYER
-// ══════════════════════════════════════════════════════════
-
-let planLayerExpanded = false;
-
-function togglePlanLayer() {
-  planLayerExpanded = !planLayerExpanded;
-  const body  = document.getElementById('plan-layer-body');
-  const arrow = document.getElementById('plan-layer-arrow');
-  if(body)  body.style.display  = planLayerExpanded ? 'block' : 'none';
-  if(arrow) arrow.textContent   = planLayerExpanded ? '▲' : '▼';
-}
-
-function selectPlanDate(dateStr) {
-  document.querySelectorAll('.plan-date-btn').forEach(b => {
-    b.classList.toggle('act-blue', b.dataset.date === dateStr);
-  });
-  const inp = document.getElementById('plan-override-text');
-  if(!inp) return;
-  const plan = getPlan();
-  inp.value = plan.session_overrides[dateStr] || '';
-  inp.dataset.date = dateStr;
-}
-
-function addPlanOverride() {
-  const inp = document.getElementById('plan-override-text');
-  if(!inp || !inp.dataset.date || !inp.value.trim()) return;
-  const plan = getPlan();
-  plan.session_overrides[inp.dataset.date] = inp.value.trim();
-  savePlan(plan);
-  renderPlanLayer();
-  // re-select the same date so editing continues
-  selectPlanDate(inp.dataset.date);
-}
-
-function deletePlanOverride(dateStr) {
-  const plan = getPlan();
-  delete plan.session_overrides[dateStr];
-  savePlan(plan);
-  renderPlanLayer();
-}
-
-function savePlanLayer() {
-  const intentEl = document.getElementById('plan-week-intent');
-  const plan = getPlan();
-  plan.week_intent = intentEl ? intentEl.value.trim() : plan.week_intent;
-  savePlan(plan);
-  showToast('Plan saved ✓');
-}
-
-function renderPlanLayer() {
-  const container = document.getElementById('plan-layer');
-  if(!container) return;
-
-  const plan = getPlan();
-
-  // Build 3-day date list: today, tomorrow, day after
-  const days = [0, 1, 2].map(i => {
-    const d = new Date();
-    d.setDate(d.getDate() + i);
-    return d.toISOString().split('T')[0];
-  });
-
-  const fmt = ds => {
-    const [y, m, day] = ds.split('-');
-    const labels = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-    const d = new Date(+y, +m - 1, +day);
-    return labels[d.getDay()] + ' ' + (+day);
-  };
-
-  const overrideList = days
-    .filter(d => plan.session_overrides[d])
-    .map(d => `
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:12px">
-        <span style="color:var(--text3);min-width:46px">${fmt(d)}</span>
-        <span style="flex:1;color:var(--text1)">${plan.session_overrides[d]}</span>
-        <button onclick="deletePlanOverride('${d}')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;padding:0 4px">✕</button>
-      </div>`).join('');
-
-  const dateBtns = days.map(d =>
-    `<button class="tog-btn plan-date-btn" data-date="${d}" onclick="selectPlanDate('${d}')">${fmt(d)}</button>`
-  ).join('');
-
-  container.innerHTML = `
-    <div class="card" style="padding:12px 14px">
-      <div onclick="togglePlanLayer()" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none">
-        <span style="font-size:12px;font-weight:700;color:var(--text2);letter-spacing:.05em">WEEK PLAN</span>
-        <span id="plan-layer-arrow" style="color:var(--text3);font-size:11px">${planLayerExpanded ? '▲' : '▼'}</span>
-      </div>
-      <div id="plan-layer-body" style="display:${planLayerExpanded ? 'block' : 'none'};margin-top:12px">
-        <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Week intent</div>
-        <textarea id="plan-week-intent" rows="2"
-          style="width:100%;background:var(--card2);border:1px solid #333;border-radius:6px;color:var(--text1);font-size:13px;padding:8px;resize:none;box-sizing:border-box"
-          placeholder="e.g. Focus on recovery, shift ends Wed">${plan.week_intent}</textarea>
-        <button onclick="savePlanLayer()" style="margin-top:6px;padding:5px 14px;background:var(--blue);border:none;border-radius:6px;color:#fff;font-size:12px;font-weight:700;cursor:pointer">Save</button>
-
-        <div style="margin-top:14px;font-size:11px;color:var(--text3);margin-bottom:6px">Session overrides</div>
-        ${overrideList || '<div style="font-size:11px;color:var(--text3);margin-bottom:8px">No overrides set</div>'}
-
-        <div style="display:flex;gap:6px;margin-bottom:8px">${dateBtns}</div>
-        <div style="display:flex;gap:6px">
-          <input id="plan-override-text" type="text" placeholder="Override note…"
-            style="flex:1;background:var(--card2);border:1px solid #333;border-radius:6px;color:var(--text1);font-size:12px;padding:6px 8px">
-          <button onclick="addPlanOverride()" style="padding:6px 12px;background:var(--blue);border:none;border-radius:6px;color:#fff;font-size:12px;font-weight:700;cursor:pointer">Add</button>
-        </div>
-      </div>
-    </div>`;
-}
 
 // ══════════════════════════════════════════════════════════
 //  FIRST RUN
@@ -3971,13 +3852,6 @@ function buildAIContext(data) {
     ? flags.map(f => `[${f.severity.toUpperCase()}] ${f.label}`).join(', ')
     : 'None';
 
-  // ── Plan layer ─────────────────────────────────────────────
-  const plan = getPlan();
-  const planStr = [
-    plan.week_intent ? `Week intent: ${plan.week_intent}` : '',
-    ...Object.entries(plan.session_overrides || {}).map(([d2, v]) => `Override ${d2}: ${v}`)
-  ].filter(Boolean).join(' | ') || 'None';
-
   // ── Off Work override ──────────────────────────────────────
   let offWorkCtx = '';
   if(isOffWork()) {
@@ -4018,7 +3892,6 @@ Recommendation: "${tomorrowRule.opt}" — ${tomorrowRule.desc}`,
     liftWeights:   `Lift A: ${liftWeightStr('liftA')}. Lift B: ${liftWeightStr('liftB')}.`,
     liftHistory:   getLiftHistory(),
     flags:         flagStr,
-    plan:          planStr,
     sessionNotes:  notesStr,
     offWorkCtx,
   };
@@ -4090,7 +3963,6 @@ No motivational filler. No generic advice. Write like you have been coaching him
   const userMsg = `${ctx.offWorkCtx ? `🚫 SCHEDULE OVERRIDE — READ BEFORE ANYTHING ELSE: ${ctx.offWorkCtx}\n\n` : ''}${ctx.profile}
 
 FLAGS: ${ctx.flags}
-PLAN: ${ctx.plan}
 
 === SESSION NOTES (can override the schedule below) ===
 ${ctx.sessionNotes}
@@ -4468,8 +4340,6 @@ async function init() {
   initLogTab();
   history.replaceState({page:'today'}, '', '');
 
-  renderPlanLayer();
-
   try {
     const data = await loadAllSheetData();
     if(data.dataUnavailable) {
@@ -4818,6 +4688,11 @@ if('serviceWorker' in navigator) {
           showUpdateBanner(incoming);
         }
       });
+    });
+
+    // Re-check for updates when user returns to the tab
+    document.addEventListener('visibilitychange', () => {
+      if(document.visibilityState === 'visible') reg.update();
     });
   }).catch(() => {});
 }
