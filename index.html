@@ -3298,6 +3298,9 @@ function saveLog() {
   if(logState.sessionNote) {
     const slog = S.getJSON('session_log_' + logTargetDate());
     pushSessionNote({ date:logTargetDate(), note:logState.sessionNote, session:slog?.dayName || '' });
+    // Bust today's coaching cache so the brief regenerates with the new session note context
+    S.del('coaching_morning_' + todayISO());
+    S.del('coaching_evening_' + todayISO());
   }
 
   const chip = document.getElementById('log-saved-chip');
@@ -3952,8 +3955,8 @@ Respond ONLY with valid JSON — no markdown fences, no prose outside the JSON. 
 }
 
 ${isMorn
-  ? `Morning note rules: Lead with sleep quality (score, hours, deep, REM) and what they mean for capacity. One sentence on BB + HRV with a clear read on load capacity. Follow with today's session — honour any session note override unless BB < 35 (lifts) or HRV crashed. Close with a sharp, data-tied action.${isNoWake ? ' Wake BB unavailable — use readiness/HRV instead, do not reference wake BB.' : ''}${isNoSlp ? ' Sleep data unavailable — do not reference sleep score or hours as fact.' : ''}`
-  : `Evening note rules: Never open with judgment on skipped sessions. Assess today first, then name the single biggest recovery factor for tonight, then preview tomorrow's session + BB threshold, then one concrete recovery action tied to shift status.`}
+  ? `Morning note rules: Lead with sleep quality (score, hours, deep, REM) and what they mean for capacity. One sentence on BB + HRV with a clear read on load capacity. Follow with today's session — honour any session note override unless BB < 35 (lifts) or HRV crashed. If session notes mention schedule or lifestyle context (e.g. off work, extra rest days, vacation, solo parenting stretch), factor that into load and recovery recommendations — more recovery bandwidth means more latitude to push or an explicit nudge to bank extra sleep. Close with a sharp, data-tied action.${isNoWake ? ' Wake BB unavailable — use readiness/HRV instead, do not reference wake BB.' : ''}${isNoSlp ? ' Sleep data unavailable — do not reference sleep score or hours as fact.' : ''}`
+  : `Evening note rules: Never open with judgment on skipped sessions. Assess today first, then name the single biggest recovery factor for tonight, then preview tomorrow's session + BB threshold, then one concrete recovery action tied to shift status. If session notes mention schedule or lifestyle context (e.g. off work, extra rest days), factor that into the recovery and load recommendation for the coming days.`}
 
 No motivational filler. No generic advice. Write like you have been coaching him for months.`;
 
