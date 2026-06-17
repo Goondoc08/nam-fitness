@@ -4689,6 +4689,11 @@ if('serviceWorker' in navigator) {
         }
       });
     });
+
+    // Re-check for updates when user returns to the tab
+    document.addEventListener('visibilitychange', () => {
+      if(document.visibilityState === 'visible') reg.update();
+    });
   }).catch(() => {});
 }
 </script>
