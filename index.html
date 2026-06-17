@@ -273,6 +273,17 @@ body{
 }
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
+/* ── Update banner ───────────────────────────────────────── */
+#update-banner{
+  position:fixed;bottom:58px;left:0;right:0;
+  background:var(--bg2);border-top:1px solid var(--green);
+  display:none;align-items:center;justify-content:space-between;
+  padding:10px 16px;z-index:99;gap:10px;
+}
+#update-banner.show{display:flex}
+#update-banner-msg{font-size:13px;color:var(--text1);font-weight:600;flex:1}
+#update-banner-btn{background:var(--green);color:#0D0F14;border:none;border-radius:8px;padding:6px 14px;font-size:13px;font-weight:700;cursor:pointer}
+
 /* ── Trends tab ──────────────────────────────────────────── */
 .spark-wrap{position:relative;height:44px}
 .spark-bars{display:flex;align-items:flex-end;gap:3px;height:100%}
@@ -1388,6 +1399,10 @@ input:checked ~ .toggle-slider-orange::before{background:var(--orange);transform
 </nav>
 
 <div class="toast" id="toast"></div>
+<div id="update-banner">
+  <span id="update-banner-msg">⬆ Update available</span>
+  <button id="update-banner-btn" onclick="applyUpdate()">Reload</button>
+</div>
 
 <script>
 'use strict';
@@ -4644,9 +4659,33 @@ checkFirstRun();
 checkExportNudge();
 if(getAnthropicKey() && getSheetsKey()) init();
 
-// Service worker
+// Service worker + update banner
+let _waitingSW = null;
+
+function showUpdateBanner(worker) {
+  _waitingSW = worker;
+  document.getElementById('update-banner')?.classList.add('show');
+}
+
+function applyUpdate() {
+  if(_waitingSW) _waitingSW.postMessage({ type: 'SKIP_WAITING' });
+  navigator.serviceWorker.addEventListener('controllerchange', () => location.reload());
+}
+
 if('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./sw.js').catch(()=>{});
+  navigator.serviceWorker.register('./sw.js').then(reg => {
+    // Already a waiting worker on page load (e.g. user reopened app)
+    if(reg.waiting) showUpdateBanner(reg.waiting);
+
+    reg.addEventListener('updatefound', () => {
+      const incoming = reg.installing;
+      incoming.addEventListener('statechange', () => {
+        if(incoming.state === 'installed' && navigator.serviceWorker.controller) {
+          showUpdateBanner(incoming);
+        }
+      });
+    });
+  }).catch(() => {});
 }
 </script>
 </body>
