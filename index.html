@@ -1447,6 +1447,20 @@ input:checked ~ .toggle-slider-orange::before{background:var(--orange);transform
 'use strict';
 
 // ══════════════════════════════════════════════════════════
+//  GLOBAL ERROR SURFACE — show any uncaught crash on-screen
+// ══════════════════════════════════════════════════════════
+window.onerror = function(msg, src, line, col, err) {
+  try {
+    const el = document.getElementById('data-note');
+    if(el) {
+      el.innerHTML = `⚠️ App error: ${msg} <span style="color:var(--text3)">(line ${line})</span> <button onclick="location.reload()" style="margin-left:8px;background:none;border:1px solid var(--orange);color:var(--orange);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer">↻ Reload</button>`;
+      el.style.display = 'block';
+    }
+  } catch(e) {}
+  return false;
+};
+
+// ══════════════════════════════════════════════════════════
 //  CONSTANTS
 // ══════════════════════════════════════════════════════════
 const SHEET_ID_DEFAULT  = '1MVwt__xhzeIOL1fCXWSb621VCLxIvd8dQMuem2cfJZA';
@@ -4417,9 +4431,10 @@ async function init() {
   initWhatsNew();
   history.replaceState({page:'today'}, '', '');
 
-  // Render localStorage-based UI immediately — no network needed
-  generateDailyBrief(false);
-  renderTrends(null);
+  // Render localStorage-based UI immediately — no network needed.
+  // Each wrapped so one failure can't blank the rest of the page.
+  try { renderTrends(null); }      catch(e){ console.error('renderTrends(null)', e); }
+  try { generateDailyBrief(false); } catch(e){ console.error('generateDailyBrief', e); }
 
   showDataNote('🔄 Loading Garmin data…');
   try {
