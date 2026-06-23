@@ -1450,16 +1450,23 @@ input:checked ~ .toggle-slider-orange::before{background:var(--orange);transform
 // ══════════════════════════════════════════════════════════
 //  GLOBAL ERROR SURFACE — show any uncaught crash on-screen
 // ══════════════════════════════════════════════════════════
-window.onerror = function(msg, src, line, col, err) {
+function surfaceError(label, detail) {
   try {
     const el = document.getElementById('data-note');
     if(el) {
-      el.innerHTML = `⚠️ App error: ${msg} <span style="color:var(--text3)">(line ${line})</span> <button onclick="location.reload()" style="margin-left:8px;background:none;border:1px solid var(--orange);color:var(--orange);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer">↻ Reload</button>`;
+      el.innerHTML = `⚠️ ${label}: ${detail} <button onclick="location.reload()" style="margin-left:8px;background:none;border:1px solid var(--orange);color:var(--orange);border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer">↻ Reload</button>`;
       el.style.display = 'block';
     }
   } catch(e) {}
+}
+window.onerror = function(msg, src, line, col, err) {
+  surfaceError('App error', `${msg} (line ${line})`);
   return false;
 };
+window.addEventListener('unhandledrejection', function(ev) {
+  const r = ev.reason;
+  surfaceError('Async error', (r && (r.stack || r.message)) || String(r));
+});
 
 // ══════════════════════════════════════════════════════════
 //  CONSTANTS
@@ -4425,17 +4432,17 @@ function renderInsights(daily) {
 //  INIT
 // ══════════════════════════════════════════════════════════
 async function init() {
-  initOffWork();
-  renderStaticUI();
-  renderSessionPage();
-  initLogTab();
-  initWhatsNew();
-  history.replaceState({page:'today'}, '', '');
-
-  // Render localStorage-based UI immediately — no network needed.
-  // Each wrapped so one failure can't blank the rest of the page.
-  try { renderTrends(null); }      catch(e){ console.error('renderTrends(null)', e); }
-  try { generateDailyBrief(false); } catch(e){ console.error('generateDailyBrief', e); }
+  // Each step wrapped + labelled so a single failure can't blank the page
+  // and we can see exactly which one broke.
+  const step = (label, fn) => { try { fn(); } catch(e){ console.error(label, e); surfaceError('Crash in ' + label, e.message); } };
+  step('initOffWork',       initOffWork);
+  step('renderStaticUI',    renderStaticUI);
+  step('renderSessionPage', renderSessionPage);
+  step('initLogTab',        initLogTab);
+  step('initWhatsNew',      initWhatsNew);
+  try { history.replaceState({page:'today'}, '', ''); } catch(e){}
+  step('renderTrends',      () => renderTrends(null));
+  step('generateDailyBrief',() => generateDailyBrief(false));
 
   showDataNote('🔄 Loading Garmin data…');
   try {
@@ -4793,7 +4800,7 @@ function dismissExportNudge() {
 }
 
 // Start
-const BUILD = 'v8 · ' + new Date().toISOString().slice(11,16);
+const BUILD = 'v9 · ' + new Date().toISOString().slice(11,16);
 try { document.getElementById('build-tag').textContent = 'build ' + BUILD; } catch(e){}
 
 checkFirstRun();
