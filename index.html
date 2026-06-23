@@ -726,6 +726,7 @@ input:checked ~ .toggle-slider-orange::before{background:var(--orange);transform
     <div>
       <div class="page-title" id="greeting">Good morning, Nicholas</div>
       <div class="page-sub" id="today-date">—</div>
+      <div class="page-sub" id="build-tag" style="color:var(--swim);font-size:11px;margin-top:2px">build —</div>
     </div>
     <button class="gear-btn" onclick="openSettings()" aria-label="Settings">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -4792,9 +4793,19 @@ function dismissExportNudge() {
 }
 
 // Start
+const BUILD = 'v8 · ' + new Date().toISOString().slice(11,16);
+try { document.getElementById('build-tag').textContent = 'build ' + BUILD; } catch(e){}
+
 checkFirstRun();
 checkExportNudge();
-if(getAnthropicKey() && getSheetsKey()) init();
+if(getAnthropicKey() && getSheetsKey()) {
+  init();
+} else {
+  // Keys missing — surface it instead of silently doing nothing
+  const missing = [!getAnthropicKey() && 'Anthropic key', !getSheetsKey() && 'Google Sheets key'].filter(Boolean).join(' & ');
+  try { renderTrends(null); } catch(e){ console.error(e); }
+  showDataNote(`⚠️ Missing ${missing} — open ⚙️ Settings and re-enter. Garmin metrics & coach note need this; your logs are safe.`);
+}
 
 // Service worker + update banner
 let _waitingSW = null;
