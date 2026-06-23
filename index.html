@@ -296,15 +296,26 @@ body{
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
 /* ── Update banner ───────────────────────────────────────── */
-#update-banner{
-  position:fixed;bottom:58px;left:0;right:0;
-  background:var(--bg2);border-top:1px solid var(--green);
-  display:none;align-items:center;justify-content:space-between;
-  padding:10px 16px;z-index:99;gap:10px;
+#update-modal-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.8);
+  z-index:600;display:flex;align-items:center;justify-content:center;
+  padding:20px;
+  opacity:0;pointer-events:none;
+  transition:opacity .25s;
+  backdrop-filter:blur(8px);
 }
-#update-banner.show{display:flex}
-#update-banner-msg{font-size:13px;color:var(--text1);font-weight:600;flex:1}
-#update-banner-btn{background:var(--green);color:#0D0F14;border:none;border-radius:8px;padding:6px 14px;font-size:13px;font-weight:700;cursor:pointer}
+#update-modal-overlay.show{opacity:1;pointer-events:all}
+#update-modal-card{
+  background:var(--card);
+  border:1px solid var(--border2);
+  border-radius:20px;
+  width:100%;max-width:380px;
+  padding:28px 24px 24px;
+  transform:translateY(16px) scale(.97);
+  transition:transform .3s cubic-bezier(.32,1,.23,1);
+  text-align:center;
+}
+#update-modal-overlay.show #update-modal-card{transform:translateY(0) scale(1)}
 
 /* ── Trends tab ──────────────────────────────────────────── */
 .spark-wrap{position:relative;height:44px}
@@ -1420,9 +1431,15 @@ input:checked ~ .toggle-slider-orange::before{background:var(--orange);transform
 </nav>
 
 <div class="toast" id="toast"></div>
-<div id="update-banner">
-  <span id="update-banner-msg">⬆ Update available</span>
-  <button id="update-banner-btn" onclick="applyUpdate()">Reload</button>
+<div id="update-modal-overlay">
+  <div id="update-modal-card">
+    <div style="font-size:36px;margin-bottom:10px">⬆️</div>
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--green);margin-bottom:4px">App Update Ready</div>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:16px" id="update-modal-version"></div>
+    <div style="text-align:left;font-size:14px;color:var(--text2);line-height:1.7;padding:14px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid var(--border);margin-bottom:20px" id="update-modal-notes"></div>
+    <button onclick="applyUpdate()" style="width:100%;padding:14px;border-radius:12px;background:var(--green);border:none;color:#0D0F14;font-size:15px;font-weight:700;cursor:pointer;letter-spacing:.02em;margin-bottom:10px">Reload & Apply Update</button>
+    <button onclick="dismissUpdateModal()" style="width:100%;padding:10px;border-radius:12px;background:none;border:1px solid var(--border2);color:var(--text2);font-size:14px;cursor:pointer">Not now</button>
+  </div>
 </div>
 
 <script>
@@ -1863,9 +1880,19 @@ async function fetchSheet(tabName) {
   const id  = getSheetId();
   if(!key || !id) return null;
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${id}/values/${encodeURIComponent(tabName)}?key=${key}`;
-  const res = await fetch(url);
-  if(!res.ok) { console.error('Sheet fetch failed', tabName, res.status); return null; }
-  return parseSheet(await res.json());
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15000);
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timer);
+    if(!res.ok) { console.error('Sheet fetch failed', tabName, res.status); return null; }
+    return parseSheet(await res.json());
+  } catch(e) {
+    clearTimeout(timer);
+    if(e.name === 'AbortError') console.error('Sheet fetch timed out', tabName);
+    else console.error('Sheet fetch error', tabName, e);
+    return null;
+  }
 }
 
 async function fetchSnapshot() {
@@ -4374,6 +4401,9 @@ async function init() {
   initWhatsNew();
   history.replaceState({page:'today'}, '', '');
 
+  // Show cached brief immediately — no network needed, no tokens burned
+  generateDailyBrief(false);
+
   try {
     const data = await loadAllSheetData();
     if(data.dataUnavailable) {
@@ -4729,12 +4759,24 @@ if(getAnthropicKey() && getSheetsKey()) init();
 // Service worker + update banner
 let _waitingSW = null;
 
-function showUpdateBanner(worker) {
+const UPDATE_VERSION = 'v1.1';
+const UPDATE_NOTES   = `Export now includes nicotine and blood pressure data — previously saved locally but left out of the JSON.\n\nAdded this update popup so you always know what changed.\n\nFixed a hang where the app could stay blank if Garmin data took too long to load. Also, the coaching note now shows instantly from cache on reload — no tokens burned.`;
+
+function showUpdateModal(worker) {
   _waitingSW = worker;
-  document.getElementById('update-banner')?.classList.add('show');
+  document.getElementById('update-modal-version').textContent = UPDATE_VERSION;
+  document.getElementById('update-modal-notes').innerHTML = UPDATE_NOTES.replace(/\n\n/g,'<br><br>').replace(/\n/g,'<br>');
+  document.getElementById('update-modal-overlay').classList.add('show');
+  document.body.style.overflow = 'hidden';
+}
+
+function dismissUpdateModal() {
+  document.getElementById('update-modal-overlay').classList.remove('show');
+  document.body.style.overflow = '';
 }
 
 function applyUpdate() {
+  dismissUpdateModal();
   if(_waitingSW) _waitingSW.postMessage({ type: 'SKIP_WAITING' });
   navigator.serviceWorker.addEventListener('controllerchange', () => location.reload());
 }
@@ -4742,13 +4784,13 @@ function applyUpdate() {
 if('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js').then(reg => {
     // Already a waiting worker on page load (e.g. user reopened app)
-    if(reg.waiting) showUpdateBanner(reg.waiting);
+    if(reg.waiting) showUpdateModal(reg.waiting);
 
     reg.addEventListener('updatefound', () => {
       const incoming = reg.installing;
       incoming.addEventListener('statechange', () => {
         if(incoming.state === 'installed' && navigator.serviceWorker.controller) {
-          showUpdateBanner(incoming);
+          showUpdateModal(incoming);
         }
       });
     });
