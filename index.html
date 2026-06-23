@@ -4417,13 +4417,22 @@ async function init() {
   initWhatsNew();
   history.replaceState({page:'today'}, '', '');
 
-  // Show cached brief immediately — no network needed, no tokens burned
+  // Render localStorage-based UI immediately — no network needed
   generateDailyBrief(false);
+  renderTrends(null);
 
+  showDataNote('🔄 Loading Garmin data…');
   try {
     const data = await loadAllSheetData();
+    document.getElementById('data-note').style.display = 'none';
+
     if(data.dataUnavailable) {
-      showDataNote('⚠️ Could not load sheet data — check API key and sheet sharing settings.');
+      showDataNote('⚠️ Garmin sheet unreachable — API may be down or key invalid. Tap ↻ Retry.');
+      return;
+    }
+    const snapKeys = Object.keys(data.snap || {}).length;
+    if(!snapKeys) {
+      showDataNote('⚠️ Sheet connected but snapshot is empty — Garmin may not have synced yet. Tap ↻ Retry.');
       return;
     }
     sheetDataGlobal = data;
