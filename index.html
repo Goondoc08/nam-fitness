@@ -4470,7 +4470,7 @@ function renderRunningLog() {
 // ══════════════════════════════════════════════════════════
 async function exportData() {
   showToast('Building export…');
-  const out = { exportedAt: new Date().toISOString(), sessions: {}, lifestyle: {}, stretch: {}, nicotine: {}, garmin: null };
+  const out = { exportedAt: new Date().toISOString(), sessions: {}, lifestyle: {}, stretch: {}, nicotine: {}, blood_pressure: {}, garmin: null };
 
   out.on_demand = {};
   Object.keys(localStorage).forEach(k => {
@@ -4479,6 +4479,7 @@ async function exportData() {
     else if(k.startsWith('nam_stretch_log_')) { const ds = k.replace('nam_stretch_log_',''); out.stretch[ds] = S.getJSON('stretch_log_'+ds); }
     else if(k.startsWith('nam_on_demand_log_')) { const key = k.replace('nam_on_demand_log_',''); out.on_demand[key] = S.getJSON('on_demand_log_'+key); }
     else if(k.startsWith('nam_nic_'))           { const ds = k.replace('nam_nic_','');             out.nicotine[ds]   = S.getJSON('nic_'+ds); }
+    else if(k.startsWith('nam_bp_'))            { const ds = k.replace('nam_bp_','');              out.blood_pressure[ds] = S.getJSON('bp_'+ds); }
   });
 
   // Attempt to pull Garmin sheet data
