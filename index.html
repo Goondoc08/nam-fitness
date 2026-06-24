@@ -736,7 +736,7 @@ input:checked ~ .toggle-slider-orange::before{background:var(--orange);transform
   <!-- Cycle + Week badges -->
   <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
     <div class="badge badge-gray" id="cycle-badge">Day — of 6</div>
-    <div class="badge badge-gray" id="week-badge">Week — of 12</div>
+    <div class="badge badge-gray" id="week-badge">Cycle — of 12</div>
     <div class="badge badge-gray" id="shift-badge">—</div>
   </div>
   <div id="off-work-strip" style="margin-bottom:12px"></div>
@@ -830,12 +830,12 @@ input:checked ~ .toggle-slider-orange::before{background:var(--orange);transform
       <div class="card-label">💓 HRV</div>
       <div style="font-size:36px;font-weight:800;line-height:1" id="hrv-val">—</div>
       <div style="margin-top:8px" id="hrv-badge"></div>
-      <div style="font-size:11px;color:var(--text3);margin-top:4px">Baseline 27–30ms</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:4px">Baseline 33–37ms</div>
     </div>
     <div class="card" style="margin-bottom:0">
       <div class="card-label">🫁 VO₂ Max</div>
       <div style="font-size:36px;font-weight:800;line-height:1" id="vo2-val">—</div>
-      <div style="font-size:11px;color:var(--text3);margin-top:8px">Target 34–35</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:8px">Target 38</div>
     </div>
   </div>
 
@@ -1123,7 +1123,7 @@ input:checked ~ .toggle-slider-orange::before{background:var(--orange);transform
   <div class="top-bar">
     <div>
       <div class="page-title">Trends</div>
-      <div class="page-sub" id="trends-sub">Week — of 12</div>
+      <div class="page-sub" id="trends-sub">Cycle — of 12</div>
     </div>
   </div>
 
@@ -1216,7 +1216,7 @@ input:checked ~ .toggle-slider-orange::before{background:var(--orange);transform
     </div>
     <div style="font-size:12px;color:var(--text3);margin-top:6px" id="vo2-trend-date"></div>
     <div style="font-size:13px;color:var(--text2);line-height:1.6;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)" id="vo2-context">
-      Target 34–35 mL/kg/min by Week 12. Garmin updates VO₂ from outdoor GPS runs, treadmill with chest strap, or cycling with power meter — not from swimming or lifting.
+      Target 38 mL/kg/min by Cycle 12 (already past the original 34–35). Running is the only lever — aim for 1 run per cycle, min 20 min with GPS. Garmin updates VO₂ from outdoor GPS runs, treadmill with chest strap, or cycling with power meter — not from swimming or lifting.
     </div>
   </div>
 
@@ -1614,9 +1614,11 @@ function getAllBPLogs() {
 // ── Medical context ───────────────────────────────────────
 function getMedical() {
   return S.getJSON('medical') || {
-    sleep_study_status:'ordered', glp1_dose:'40 units/week',
+    sleep_study_status:'referral pending — #1 PCP item (SpO₂ to 79% floor; breathing is the recovery limiter, not training)',
+    glp1_dose:'40 units/week',
+    protein_target:'180–200g/day',
     nicotine_stage:'~9 lozenges/day, patch trial ongoing',
-    bp_monitoring:'active, machine incoming',
+    bp_monitoring:'active — morning avg ~127/79 (borderline elevated); PCP visit pending, discuss alongside sleep study (apnea + BP linked)',
     pcp_last_visit:'', notes:''
   };
 }
@@ -1791,7 +1793,7 @@ function getCycleIdx() {
 }
 function getWeekNum() {
   const diff = Math.round((todayMidnight() - BLOCK_START) / 86400000);
-  return Math.max(1, Math.floor(diff / 6) + 1); // weeks = 6-day training cycles
+  return Math.max(1, Math.floor(diff / 6) + 1); // block progress counts 6-day cycles, NOT 7-day weeks
 }
 function getGreeting() {
   const h = new Date().getHours();
@@ -1872,7 +1874,7 @@ function renderStaticUI() {
   };
   cycleBadge.style.cssText = `background:${tintMap[day.color]||'rgba(255,255,255,.08)'};color:${day.color};border:1px solid ${day.color}40`;
 
-  document.getElementById('week-badge').textContent = `Week ${week} of ${WEEK_TOTAL}`;
+  document.getElementById('week-badge').textContent = `Cycle ${week} of ${WEEK_TOTAL}`;
   document.getElementById('shift-badge').textContent = day.badge;
 
   // Compact session chip
@@ -1976,9 +1978,9 @@ function renderMetrics(data) {
   const hrv = n(snap.hrv_ms);
   if(hrv !== null) {
     document.getElementById('hrv-val').textContent = hrv;
-    const [cls, label] = hrv >= 33 ? ['badge-green','✅ Strong — above baseline'] :
-                         hrv >= 27 ? ['badge-blue','Normal baseline'] :
-                         hrv >= 25 ? ['badge-yellow','Below baseline'] :
+    const [cls, label] = hrv >= 37 ? ['badge-green','✅ Strong night'] :
+                         hrv >= 33 ? ['badge-blue','Normal baseline'] :
+                         hrv >= 29 ? ['badge-yellow','Below baseline'] :
                                      ['badge-red','⚠️ Flag — reduce load'];
     document.getElementById('hrv-badge').innerHTML = makeBadge(label, cls);
   }
@@ -2023,7 +2025,7 @@ function renderMetrics(data) {
   if(vo2 !== null) {
     document.getElementById('vo2-val').textContent = vo2;
     document.getElementById('vo2-val').style.color =
-      vo2 >= 34 ? 'var(--green)' : vo2 >= 32 ? 'var(--cardio)' : 'var(--lift)';
+      vo2 >= 38 ? 'var(--green)' : vo2 >= 36 ? 'var(--cardio)' : 'var(--lift)';
   }
 
   // Intensity Minutes — all three values (mod, vig, weekly total) come from the weekly sum.
@@ -2471,14 +2473,14 @@ const WORKOUT_DETAIL = [
 // ══════════════════════════════════════════════════════════
 const LIFT_DEFS = {
   liftA:[
-    {name:'Squat',    key:'squat',    default:110},
-    {name:'Bench',    key:'bench',    default:85},
-    {name:'Row',      key:'row',      default:85},
+    {name:'Squat',    key:'squat',    default:120},
+    {name:'Bench',    key:'bench',    default:95},
+    {name:'Row',      key:'row',      default:95},
   ],
   liftB:[
-    {name:'Deadlift', key:'deadlift', default:135, adv:'+5 lbs when all 5×5 clean'},
-    {name:'Fl.Press', key:'flpress',  default:50,  adv:'+5 lbs when all 5×5 clean'},
-    {name:'Lat Pull', key:'latpull',  default:80,  adv:'+5 lbs when all 5×5 clean'},
+    {name:'Deadlift', key:'deadlift', default:155, adv:'+5 lbs when all 5×5 clean'},
+    {name:'Fl.Press', key:'flpress',  default:60,  adv:'+5 lbs when all 5×5 clean'},
+    {name:'Lat Pull', key:'latpull',  default:100, adv:'+5 lbs when all 5×5 clean'},
   ],
 };
 
@@ -3562,7 +3564,7 @@ function computeFlags(snap, daily) {
   const n = v => { const x = parseFloat(v); return isNaN(x) ? null : x; };
 
   const bb    = n(snap.bb_wake);
-  const hrv   = n(snap.hrv_rmssd);
+  const hrv   = n(snap.hrv_ms);
   const sleep = n(snap.sleep_hrs);
   const sleepScore = n(snap.sleep_score);
   const rhr   = n(snap.resting_hr);
@@ -3573,9 +3575,9 @@ function computeFlags(snap, daily) {
   if(bb !== null && bb < 35)
     flags.push({ key:'low_bb', label:'Low wake BB', severity:'red', value:bb });
 
-  // 2. Low HRV
-  if(hrv !== null && hrv < 40)
-    flags.push({ key:'low_hrv', label:'Low HRV', severity: hrv < 30 ? 'red' : 'amber', value:hrv });
+  // 2. Low HRV — baseline 33–37ms; flag below 33, red below 29
+  if(hrv !== null && hrv < 33)
+    flags.push({ key:'low_hrv', label:'Low HRV', severity: hrv < 29 ? 'red' : 'amber', value:hrv });
 
   // 3. Short sleep
   if(sleep !== null && sleep < 6)
@@ -3585,9 +3587,9 @@ function computeFlags(snap, daily) {
   if(sleepScore !== null && sleepScore < 60)
     flags.push({ key:'low_sleep_score', label:'Poor sleep score', severity:'amber', value:sleepScore });
 
-  // 5. Elevated resting HR
-  if(rhr !== null && rhr > 65)
-    flags.push({ key:'elevated_rhr', label:'Elevated RHR', severity: rhr > 72 ? 'red' : 'amber', value:rhr });
+  // 5. Elevated resting HR — baseline 53–55 bpm; flag above 60, red above 66
+  if(rhr !== null && rhr > 60)
+    flags.push({ key:'elevated_rhr', label:'Elevated RHR', severity: rhr > 66 ? 'red' : 'amber', value:rhr });
 
   // 6. SpO2 accumulator — 3+ nights flagged
   const spo2Days = (daily || []).slice(0, 14).filter(r => {
@@ -3898,16 +3900,22 @@ function buildAIContext(data) {
     if(parts.length) yCtx = parts.join(' ');
   }
 
-  // ── Lift weights — target (last + 5), matching lift logger UI ─
+  // ── Lift weights — ACTUAL last logged → suggested next (+5 from actual) ─
+  // Anchor the +5 to what he actually logged last, never to a starting/cycle estimate.
   function liftWeightStr(session) {
     const logs = recentLifts(session, 1);
-    const last = logs[0]?.weights;
+    const last = logs[0];
     const defs = LIFT_DEFS[session];
+    if(!last) {
+      return defs.map(d => `${d.name} ${d.default} (no log yet — starting estimate)`).join(' / ');
+    }
+    const lastW = last.weights || {};
     return defs.map(d => {
-      const lastVal = last?.[d.key];
-      const target  = lastVal !== undefined ? Math.round((lastVal + 5) * 10) / 10 : d.default;
-      return `${d.name} ${target}`;
-    }).join(' / ') + ' lbs (today\'s targets)';
+      const lastVal = lastW[d.key];
+      if(lastVal === undefined) return `${d.name} (no log)`;
+      const next = Math.round((lastVal + 5) * 10) / 10;
+      return `${d.name} last logged ${lastVal} → suggest ${next}`;
+    }).join('; ') + ` (last logged ${last.date})`;
   }
 
   // ── Lift history — checks session logs (primary) + weight logs (fallback) ─
@@ -3968,10 +3976,20 @@ function buildAIContext(data) {
     ? rollingNotes.map(n => `[${n.date}${n.session?' · '+n.session:''}] ${n.note}`).join(' | ')
     : 'None';
 
-  return {
-    profile: `Nicholas — 39yo firefighter, Pearland TX, 48/96 shift. ~235 lbs, down ~60 lbs. Recomping. Chronic sleep deficit ~2h20min for 12+ months. HRV baseline 27–30ms (33ms+ strong, under 25ms flag). BB rarely exceeds 65. No overhead pressing — floor press is the permanent substitute. Wife also firefighter on 48/96 starting day after Nicholas — always on shift Nicholas's Cycle Day 3, home from Day 4 morning. Solo parenting Cycle Day 3. Kids in daycare M/W/F 0830–1445. Backup support occasionally available.`,
+  // ── Session status (anti-hallucination) ────────────────────
+  // A session_log entry is the ONLY proof a session happened. No entry = not logged.
+  const sessionStatus = todaySessionLog
+    ? `COMPLETED — ${todaySessionLog.dayName}${todaySessionLog.shifted?' (shifted from cycle day)':''}.`
+    : `NOT LOGGED — no session has been recorded today. Do NOT state or imply it was completed; the day's session card is a recommendation, not a record.`;
 
-    metrics: `Week ${weekNum} of 12. ${blockAdh}.
+  // ── Standing medical context ───────────────────────────────
+  const med = getMedical();
+  const medicalStr = `Sleep study: ${med.sleep_study_status}. BP: ${med.bp_monitoring}. GLP-1: ${med.glp1_dose}. Protein target: ${med.protein_target || '180–200g/day'}. Nicotine: ${med.nicotine_stage}.`;
+
+  return {
+    profile: `Nicholas — 39yo firefighter, Pearland TX, 48/96 shift. ~235 lbs, down ~60 lbs. Recomping. Sleep deficit IMPROVING — ~1.6h now vs ~2.5h a year ago (bedtime ~1h earlier, sleep grew from 5h46m to 6h43m/night). Frame sleep as a positive trajectory, not a static chronic deficit. HRV baseline 33–37ms (37ms+ is a strong night, 30ms is now BELOW average, flag under 29). Resting HR 53–55. VO₂ max 36 — target 38 by end of block; running is the ONLY lever that moves VO₂ (swim/lift don't), so 1 run per cycle (min 20 min, GPS) is the active prescription. Running now in rotation (first runs Jun 8 & Jun 22) — not yet a programmed day; track separately from swim SWOLF. BB ceiling ~65–87 on best nights and capped by an unresolved sleep-breathing issue (SpO₂ to 79% floor, sleep study referral pending) — NOT a training problem; never frame the BB cap as overtraining. No overhead pressing — floor press is the permanent substitute. Wife also firefighter on 48/96 starting day after Nicholas — always on shift Nicholas's Cycle Day 3, home from Day 4 morning. Solo parenting Cycle Day 3. Kids in daycare M/W/F 0830–1445. Backup support occasionally available.`,
+
+    metrics: `Cycle ${weekNum} of 12. ${blockAdh}.
 Cycle Day ${day.num} — ${day.name}. ${getShiftPosition(idx)}
 BB wake: ${bbWake ?? '—'}${noWakeFlag} | BB current: ${bbCurrent ?? '—'} | HRV: ${hrv ?? '—'}ms${hrvTrend ? ' ('+hrvTrend+')' : ''}
 Sleep: ${sleepHrs ?? '—'} hrs · score ${sleepScore ?? '—'}/100 · deep ${deepMin ?? '—'} min · REM ${remMin ?? '—'} min${noSleepFlag}
@@ -3987,10 +4005,12 @@ Recommendation: "${tomorrowRule.opt}" — ${tomorrowRule.desc}`,
     yesterdayLog:  yCtx,
     todayActs:     `Today's activities: ${formatActs(getActsForDate(todayISO()))}`,
     yesterdayActs: `Yesterday's activities: ${formatActs(getActsForDate(offsetISO(-1)))}`,
-    liftWeights:   `Lift A: ${liftWeightStr('liftA')}. Lift B: ${liftWeightStr('liftB')}.`,
+    liftWeights:   `Lift A — ${liftWeightStr('liftA')}. Lift B — ${liftWeightStr('liftB')}. (Loads are hard data from the lift log — use directly, never estimate from Garmin; suggested weight is +5 from the ACTUAL last logged set.)`,
     liftHistory:   getLiftHistory(),
     flags:         flagStr,
     sessionNotes:  notesStr,
+    sessionStatus: sessionStatus,
+    medical:       medicalStr,
     offWorkCtx,
   };
 }
@@ -4033,7 +4053,7 @@ async function generateDailyBrief(forceRefresh = false) {
   const isNoWake = period.includes('no_wake');
   const isNoSlp  = period.includes('no_sleep');
 
-  const systemPrompt = `You are Nicholas's personal fitness coach. You know him well — 39yo firefighter, 48/96 rotation, down 60 lbs, recomping, chronic sleep deficit. HRV baseline 27–30ms. BB rarely exceeds 65.
+  const systemPrompt = `You are Nicholas's personal fitness coach. You know him well — 39yo firefighter, 48/96 rotation, down 60 lbs, recomping. Sleep deficit is shrinking and trending positive — frame it as progress, not a static chronic problem. HRV baseline 33–37ms (flag under 29; 34ms is normal now, not "strong"). Resting HR 53–55. VO₂ 36, climbing toward 38 — running is the only lever that moves it. BB ceiling (~65–87) is capped by an unresolved sleep-breathing issue (SpO₂ to 79%, sleep study pending), NOT by training load — never frame the BB cap as overtraining or a training problem.
 ${ctx.offWorkCtx ? `\n🚫 ACTIVE OVERRIDE: ${ctx.offWorkCtx} Do NOT mention station, shift, calls, fire department, or work schedule anywhere in your response. He is home with full schedule flexibility.\n` : ''}
 Respond ONLY with valid JSON — no markdown fences, no prose outside the JSON.
 
@@ -4053,14 +4073,18 @@ ${isMorn ? `Morning schema:
 }`}
 
 ${isMorn
-  ? `Morning rules: last_night leads with the quality split (score, hours, deep, REM) and what it means — not just the numbers. capacity gives a clear load verdict. today_session is exact — name the movement, load, and location; if off work drop all station/shift/call refs and use home/gym framing. this_week is one sharp adherence read. tomorrow previews the session type and the key metric threshold. spo2_note: SpO2 is a known chronic issue — mention it only if there is a specific action for today; never explain the problem at length.${isNoWake ? ' Wake BB unavailable — use readiness/HRV instead.' : ''}${isNoSlp ? ' Sleep data unavailable — do not cite sleep score or hours as fact.' : ''}`
-  : `Evening rules: headline states his condition right now. note flows as prose — open with today's session outcome (no judgment on skipped sessions), name the single biggest recovery lever for tonight, preview tomorrow's session and BB threshold, close with one concrete bedtime action. If returning to shift tomorrow, call it out explicitly. spo2_note: only if actionable tonight, never a lengthy explanation. BB: use bb_current as his state right now — bb_wake was the morning starting point and drives workout tiers only. If they differ meaningfully, you may note the drop (e.g. "started at 98, now at 43") but always close on the current value.`}
+  ? `Morning rules: last_night leads with the quality split (score, hours, deep, REM) and what it means — not just the numbers. capacity gives a clear load verdict. today_session is exact — name the movement, load, and location; it is the PLAN for today, never state or imply it is already done. If off work drop all station/shift/call refs and use home/gym framing. this_week is one sharp adherence read of the current 6-day cycle. tomorrow previews the session type and the key metric threshold. spo2_note: SpO2 is a known chronic issue with a sleep study pending — mention it only if there is a specific action for today; never explain the problem at length.${isNoWake ? ' Wake BB unavailable — use readiness/HRV instead.' : ''}${isNoSlp ? ' Sleep data unavailable — do not cite sleep score or hours as fact.' : ''}`
+  : `Evening rules: headline states his condition right now. note flows as prose. CRITICAL — obey SESSION STATUS TODAY exactly: if COMPLETED, open by acknowledging the session he did; if NOT LOGGED, you must NOT claim or imply he trained — say plainly the session isn't logged, then decide based on bb_current (his state right now): if bb_current is reasonable, give a brief "if you can still get it in tonight" nudge with the specific session; if bb_current is low enough that training would dig into reserves (roughly under 30), recommend shifting it to tomorrow instead. Never infer completion from the recommendation card. Then name the single biggest recovery lever for tonight, preview tomorrow's session and BB threshold, and close with one concrete bedtime action. If returning to shift tomorrow, call it out explicitly. spo2_note: only if actionable tonight, never a lengthy explanation. BB: use bb_current as his state right now — bb_wake was the morning starting point and drives workout tiers only. If they differ meaningfully, you may note the drop (e.g. "started at 98, now at 43") but always close on the current value.`}
 
 No motivational filler. No generic advice. Write like you have been coaching him for months.`;
 
   const userMsg = `${ctx.offWorkCtx ? `🚫 SCHEDULE OVERRIDE — READ BEFORE ANYTHING ELSE: ${ctx.offWorkCtx}\n\n` : ''}${ctx.profile}
 
+STANDING MEDICAL CONTEXT: ${ctx.medical}
+
 FLAGS: ${ctx.flags}
+
+⚑ SESSION STATUS TODAY: ${ctx.sessionStatus}
 
 === SESSION NOTES (can override the schedule below) ===
 ${ctx.sessionNotes}
@@ -4183,8 +4207,8 @@ function renderTrends(data) {
   const trackDiff    = Math.round((today - Math.max(BLOCK_START.getTime(), TRACKING_START.getTime())) / 86400000);
   const blockDay     = blockDiff + 1;
   const weekNum      = getWeekNum();
-  document.getElementById('trends-sub').textContent  = `Week ${weekNum} of ${WEEK_TOTAL}`;
-  document.getElementById('adh-week').textContent    = `Week ${weekNum} of ${WEEK_TOTAL}`;
+  document.getElementById('trends-sub').textContent  = `Cycle ${weekNum} of ${WEEK_TOTAL}`;
+  document.getElementById('adh-week').textContent    = `Cycle ${weekNum} of ${WEEK_TOTAL}`;
   document.getElementById('adh-day-count').textContent = `Day ${blockDay} of ${WEEK_TOTAL * 6}`;
 
   // Helper: any on-demand session logged for a given date
@@ -4296,10 +4320,10 @@ function renderTrends(data) {
   if(vo2 !== null) {
     document.getElementById('vo2-trend-val').textContent  = vo2;
     const el = document.getElementById('vo2-trend-val');
-    el.style.color = vo2>=34?'var(--green)':vo2>=32?'var(--cardio)':'var(--lift)';
+    el.style.color = vo2>=38?'var(--green)':vo2>=36?'var(--cardio)':'var(--lift)';
     document.getElementById('vo2-trend-badge').innerHTML  = makeBadge(
-      vo2>=34?'↑ At target':vo2>=32?'→ Approaching':'↓ Below target',
-      vo2>=34?'badge-green':vo2>=32?'badge-yellow':'badge-red'
+      vo2>=38?'↑ At target':vo2>=36?'→ Approaching':'↓ Below target',
+      vo2>=38?'badge-green':vo2>=36?'badge-yellow':'badge-red'
     );
     if(vo2Row?.date) {
       const daysSince = Math.round((new Date()-new Date(vo2Row.date+'T12:00:00'))/86400000);
@@ -4817,7 +4841,7 @@ function dismissExportNudge() {
 }
 
 // Start
-const BUILD = 'v10 · ' + new Date().toISOString().slice(11,16);
+const BUILD = 'v11 · ' + new Date().toISOString().slice(11,16);
 try { document.getElementById('build-tag').textContent = 'build ' + BUILD; } catch(e){}
 
 checkFirstRun();
@@ -4834,8 +4858,8 @@ if(getAnthropicKey() && getSheetsKey()) {
 // Service worker + update banner
 let _waitingSW = null;
 
-const UPDATE_VERSION = 'v1.1';
-const UPDATE_NOTES   = `Export now includes nicotine and blood pressure data — previously saved locally but left out of the JSON.\n\nAdded this update popup so you always know what changed.\n\nFixed a hang where the app could stay blank if Garmin data took too long to load. Also, the coaching note now shows instantly from cache on reload — no tokens burned.`;
+const UPDATE_VERSION = 'v1.2';
+const UPDATE_NOTES   = `Fixed the evening note claiming you "hit today's session" when nothing was logged. The coach now knows whether a session is actually logged — if it isn't, it'll nudge you to get it in tonight (or shift to tomorrow if your current Body Battery is too low).\n\nUpdated all your baselines: HRV now 33–37ms, resting HR 53–55, VO₂ 36 climbing to 38 (running is the lever). Strength targets extended past the originals you already hit.\n\nThe coach now knows about your sleep study referral, BP monitoring, GLP-1, protein target, and running rotation — and that your Body Battery ceiling is a breathing issue, not overtraining.\n\nLift suggestions now build +5 from what you ACTUALLY logged last, not an old starting estimate. And "Week N of 12" is now correctly "Cycle N of 12" — it was always your 6-day work cycle, not a 7-day week.`;
 
 function showUpdateModal(worker) {
   _waitingSW = worker;
