@@ -4036,7 +4036,13 @@ Recommendation: "${tomorrowRule.opt}" — ${tomorrowRule.desc}`,
   };
 }
 
-async function generateDailyBrief(forceRefresh = false) {
+// Guard against two overlapping API generations for the same note (e.g. the early
+// init render racing the post-Garmin-load call). One morning + one evening pull/day.
+let briefInFlightKey = null;
+
+// cacheOnly = render the cached note if present but NEVER hit the API (used by the
+// early init call before Garmin data has loaded, so it can't fire a wasted/empty pull).
+async function generateDailyBrief(forceRefresh = false, cacheOnly = false) {
   const period  = notePeriod();
   const textEl  = document.getElementById('coaching-text');
   const labelEl = document.getElementById('coaching-label');
@@ -4063,6 +4069,18 @@ async function generateDailyBrief(forceRefresh = false) {
     renderBriefResponse(cached, cached.generatedAt, period, true);
     return;
   }
+
+  // Early/pre-data call: show a placeholder but do NOT generate — the single
+  // post-Garmin-load call (or manual regen) is the only thing that pulls the API.
+  if(cacheOnly) {
+    if(labelEl) labelEl.textContent = isMorningPeriod(period) ? 'Morning Brief' : 'Evening Brief';
+    if(textEl)  textEl.innerHTML = `<span style="font-size:13px;color:var(--text3)">Preparing your ${isMorningPeriod(period) ? 'morning' : 'evening'} note…</span>`;
+    return;
+  }
+
+  // In-flight guard: don't fire a second API call for this note while one is running.
+  if(briefInFlightKey === key) return;
+  briefInFlightKey = key;
 
   if(textEl) textEl.innerHTML = `
     <div class="skeleton" style="width:100%;height:13px"></div>
@@ -4145,6 +4163,8 @@ PRINCIPLE: Body Battery over schedule. Sleep over training. Longevity is the goa
   } catch(e) {
     console.error('Brief error:', e);
     if(textEl) textEl.innerHTML = `<span style="color:var(--text3);font-size:13px">Could not generate note — ${e.message}</span>`;
+  } finally {
+    briefInFlightKey = null;
   }
 }
 
@@ -4487,7 +4507,7 @@ async function init() {
   step('initWhatsNew',      initWhatsNew);
   try { history.replaceState({page:'today'}, '', ''); } catch(e){}
   step('renderTrends',      () => renderTrends(null));
-  step('generateDailyBrief',() => generateDailyBrief(false));
+  step('generateDailyBrief',() => generateDailyBrief(false, true)); // cache-only: never pulls API pre-data
 
   showDataNote('🔄 Loading Garmin data…');
   try {
@@ -4862,7 +4882,7 @@ function dismissExportNudge() {
 }
 
 // Start
-const BUILD = 'v12 · ' + new Date().toISOString().slice(11,16);
+const BUILD = 'v13 · ' + new Date().toISOString().slice(11,16);
 try { document.getElementById('build-tag').textContent = 'build ' + BUILD; } catch(e){}
 
 checkFirstRun();
@@ -4879,8 +4899,8 @@ if(getAnthropicKey() && getSheetsKey()) {
 // Service worker + update banner
 let _waitingSW = null;
 
-const UPDATE_VERSION = 'v1.3';
-const UPDATE_NOTES   = `Fixed the off-work brief saying "shift starts 0600 tomorrow" when tomorrow is actually an off day. Off-work now rejoins your cycle correctly — you only return to shift when the next day is Cycle Day 1.\n\nFixed the evening note claiming you "hit today's session" when nothing was logged. The coach now knows whether a session is actually logged — if it isn't, it'll nudge you to get it in tonight (or shift to tomorrow if your current Body Battery is too low).\n\nUpdated all your baselines: HRV now 33–37ms, resting HR 53–55, VO₂ 36 climbing to 38 (running is the lever). Strength targets extended past the originals you already hit.\n\nThe coach now knows about your sleep study referral, BP monitoring, GLP-1, protein target, and running rotation — and that your Body Battery ceiling is a breathing issue, not overtraining.\n\nLift suggestions now build +5 from what you ACTUALLY logged last, not an old starting estimate. And "Week N of 12" is now correctly "Cycle N of 12" — it was always your 6-day work cycle, not a 7-day week.`;
+const UPDATE_VERSION = 'v1.4';
+const UPDATE_NOTES   = `Fixed the coaching note sometimes regenerating on app reload and burning extra API calls. Now it's strictly one morning + one evening pull a day, with cached notes shown instantly on reload — plus the manual once-a-day regenerate in Settings if you need it.\n\nFixed the off-work brief saying "shift starts 0600 tomorrow" when tomorrow is actually an off day. Off-work now rejoins your cycle correctly — you only return to shift when the next day is Cycle Day 1.\n\nFixed the evening note claiming you "hit today's session" when nothing was logged. The coach now knows whether a session is actually logged — if it isn't, it'll nudge you to get it in tonight (or shift to tomorrow if your current Body Battery is too low).\n\nUpdated all your baselines: HRV now 33–37ms, resting HR 53–55, VO₂ 36 climbing to 38 (running is the lever). Strength targets extended past the originals you already hit.\n\nThe coach now knows about your sleep study referral, BP monitoring, GLP-1, protein target, and running rotation — and that your Body Battery ceiling is a breathing issue, not overtraining.\n\nLift suggestions now build +5 from what you ACTUALLY logged last, not an old starting estimate. And "Week N of 12" is now correctly "Cycle N of 12" — it was always your 6-day work cycle, not a 7-day week.`;
 
 function showUpdateModal(worker) {
   _waitingSW = worker;
