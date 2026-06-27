@@ -1,4 +1,4 @@
-const CACHE = 'nam-v13';
+const CACHE = 'nam-v14';
 const ASSETS = ['./','./index.html','./manifest.json'];
 
 self.addEventListener('install', e => {
