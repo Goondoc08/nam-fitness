@@ -4881,7 +4881,7 @@ function dismissExportNudge() {
 }
 
 // Start
-const BUILD = 'v14 · ' + new Date().toISOString().slice(11,16);
+const BUILD = 'v15 · ' + new Date().toISOString().slice(11,16);
 try { document.getElementById('build-tag').textContent = 'build ' + BUILD; } catch(e){}
 
 checkFirstRun();
@@ -4898,8 +4898,9 @@ if(getAnthropicKey() && getSheetsKey()) {
 // Service worker + update banner
 let _waitingSW = null;
 
-const UPDATE_VERSION = 'v1.5';
-const UPDATE_NOTES   = `Fixed the morning note regenerating mid-day after you logged a session or changed off-work. Logging no longer re-pulls the coach — notes hold to one morning + one evening a day. Use the manual regenerate in Settings if you want a fresh one.\n\nFixed the coaching note sometimes regenerating on app reload and burning extra API calls. Now it's strictly one morning + one evening pull a day, with cached notes shown instantly on reload — plus the manual once-a-day regenerate in Settings if you need it.\n\nFixed the off-work brief saying "shift starts 0600 tomorrow" when tomorrow is actually an off day. Off-work now rejoins your cycle correctly — you only return to shift when the next day is Cycle Day 1.\n\nFixed the evening note claiming you "hit today's session" when nothing was logged. The coach now knows whether a session is actually logged — if it isn't, it'll nudge you to get it in tonight (or shift to tomorrow if your current Body Battery is too low).\n\nUpdated all your baselines: HRV now 33–37ms, resting HR 53–55, VO₂ 36 climbing to 38 (running is the lever). Strength targets extended past the originals you already hit.\n\nThe coach now knows about your sleep study referral, BP monitoring, GLP-1, protein target, and running rotation — and that your Body Battery ceiling is a breathing issue, not overtraining.\n\nLift suggestions now build +5 from what you ACTUALLY logged last, not an old starting estimate. And "Week N of 12" is now correctly "Cycle N of 12" — it was always your 6-day work cycle, not a 7-day week.`;
+// NOTE: REPLACE this each deploy — do not prepend. The modal shows only the current update.
+const UPDATE_VERSION = 'v1.6';
+const UPDATE_NOTES   = `Cleaned up this update popup — it now shows only the latest change instead of stacking every past update.`;
 
 function showUpdateModal(worker) {
   _waitingSW = worker;
