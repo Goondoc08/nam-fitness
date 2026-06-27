@@ -1545,10 +1545,10 @@ function renderOffWorkStrip() {
     }
     strip.innerHTML = `
       <button onclick="showOffWorkPanel()" style="font-size:11px;color:var(--text3);background:none;border:1px solid var(--border);border-radius:6px;padding:3px 10px;cursor:pointer">+ Set off-work period</button>
-      <div id="off-work-panel" style="display:none;margin-top:8px;padding:10px 12px;background:var(--bg2);border-radius:10px;border:1px solid var(--border)">
+      <div id="off-work-panel" style="display:none;margin-top:8px;padding:10px 12px;background:var(--card2);border-radius:10px;border:1px solid var(--border)">
         <div style="font-size:12px;color:var(--text2);margin-bottom:8px;font-weight:600">Back on shift</div>
         <div style="display:flex;gap:8px;align-items:center">
-          <input type="date" id="off-work-date" min="${todayISO()}" style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text1);padding:6px 10px;font-size:13px">
+          <input type="date" id="off-work-date" min="${todayISO()}" style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:6px 10px;font-size:13px">
           <button onclick="applyOffWork()" style="background:var(--green);color:#0D0F14;border:none;border-radius:8px;padding:6px 14px;font-size:13px;font-weight:700;cursor:pointer">Set</button>
         </div>
       </div>`;
@@ -1783,6 +1783,12 @@ function getGreeting() {
   return 'Hey';
 }
 function n(v) { return v !== null && v !== undefined && v !== '' ? Number(v) : null; }
+
+// Escape user-entered free text before injecting into innerHTML (notes can contain < " etc.)
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
 
 // ══════════════════════════════════════════════════════════
 //  BADGE HELPERS
@@ -3099,7 +3105,7 @@ function selectOption(i) {
   const banner = document.getElementById('session-rec-banner');
   if(banner) {
     const day  = DAYS[idx];
-    const bb   = currentBB;
+    const bb   = wakeBB; // wake BB drives recommendations — match openSessionDetail
     const dc   = DAY_COLOR[day.type] || 'var(--green)';
     const dt   = DAY_TINT[day.type]  || 'var(--green-tint)';
     const rule = getBBRule(idx, bb);
@@ -3507,8 +3513,8 @@ function notePeriod() {
   if(h < 5)   return null; // overnight — no note yet
 
   const snap      = sheetDataGlobal?.snap || {};
-  const hasBBWake = parseFloat(snap.bb_wake);
-  const hasSleep  = parseFloat(snap.sleep_hrs);
+  const hasBBWake = !isNaN(parseFloat(snap.bb_wake));
+  const hasSleep  = !isNaN(parseFloat(snap.sleep_hrs));
 
   // Both ready — generate morning note
   if(hasBBWake && hasSleep) return 'morning';
@@ -3622,7 +3628,7 @@ function renderSpo2Accum(daily) {
     return v !== null && v < 95;
   });
   if(flagged.length < 3) { line.style.display = 'none'; return; }
-  const color = flagged.length >= 6 ? 'var(--red)' : 'var(--yellow)';
+  const color = flagged.length >= 6 ? 'var(--lift)' : 'var(--cardio)';
   line.style.display = 'block';
   line.style.color   = color;
   line.innerHTML = `⚠️ SpO₂ &lt;95% on <strong>${flagged.length}</strong> of last 14 nights`;
@@ -3657,9 +3663,9 @@ function renderBPCard() {
     const s = latest.systolic, d2 = latest.diastolic;
     let label, color;
     if(s >= 180 || d2 >= 120)      { label = 'Crisis';      color = '#FF0040'; }
-    else if(s >= 140 || d2 >= 90)  { label = 'Stage 2 HTN'; color = 'var(--red)'; }
-    else if(s >= 130 || d2 >= 80)  { label = 'Stage 1 HTN'; color = 'var(--yellow)'; }
-    else if(s >= 120 && d2 < 80)   { label = 'Elevated';    color = 'var(--yellow)'; }
+    else if(s >= 140 || d2 >= 90)  { label = 'Stage 2 HTN'; color = 'var(--lift)'; }
+    else if(s >= 130 || d2 >= 80)  { label = 'Stage 1 HTN'; color = 'var(--cardio)'; }
+    else if(s >= 120 && d2 < 80)   { label = 'Elevated';    color = 'var(--cardio)'; }
     else                            { label = 'Normal';      color = 'var(--green)'; }
     badge.innerHTML = `<span style="font-size:12px;font-weight:700;color:${color};background:${color}22;padding:3px 10px;border-radius:20px">${label}</span>`;
   }
@@ -3674,7 +3680,7 @@ function renderBPCard() {
     const range = maxS - minS || 1;
     spark.innerHTML = sysVals.map((v, i) => {
       const pct  = ((v - minS) / range * 80 + 10).toFixed(1);
-      const col  = v >= 140 ? 'var(--red)' : v >= 130 ? 'var(--yellow)' : 'var(--green)';
+      const col  = v >= 140 ? 'var(--lift)' : v >= 130 ? 'var(--cardio)' : 'var(--green)';
       const isLatest = i === sysVals.length - 1;
       return `<div style="flex:1;height:${pct}%;background:${col};border-radius:2px 2px 0 0;opacity:${isLatest?1:0.65}"></div>`;
     }).join('');
@@ -4159,7 +4165,7 @@ function renderBriefResponse(resp, generatedAt, period, fromCache) {
     if(isMorningPeriod(period) && resp.last_night) {
       // Morning callout format
       const row = (icon, label, val) => val
-        ? `<div style="display:flex;gap:6px;margin-bottom:7px;font-size:13px;line-height:1.5"><span style="flex-shrink:0">${icon}</span><span><strong style="color:var(--text1)">${label}</strong> <span style="color:var(--text2)">${val}</span></span></div>`
+        ? `<div style="display:flex;gap:6px;margin-bottom:7px;font-size:13px;line-height:1.5"><span style="flex-shrink:0">${icon}</span><span><strong style="color:var(--text)">${label}</strong> <span style="color:var(--text2)">${val}</span></span></div>`
         : '';
       html = row('🌙','Last night:', resp.last_night)
            + row('⚡','Capacity:', resp.capacity)
@@ -4169,11 +4175,11 @@ function renderBriefResponse(resp, generatedAt, period, fromCache) {
       if(resp.spo2_note) html += `<div style="font-size:11px;color:var(--text3);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">· ${resp.spo2_note}</div>`;
     } else {
       // Evening prose format (and legacy cached morning notes)
-      const hl   = resp.headline        ? `<div style="font-size:13px;font-weight:700;color:var(--text1);margin-bottom:8px">${resp.headline}</div>` : '';
+      const hl   = resp.headline        ? `<div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px">${resp.headline}</div>` : '';
       const note = resp.note            ? `<div style="font-size:14px;line-height:1.65;color:var(--text2);margin-bottom:8px">${resp.note}</div>` : '';
       const sc   = resp.session_call    ? `<div style="font-size:12px;color:var(--green);margin-bottom:5px">💪 ${resp.session_call}</div>` : '';
-      const tf   = resp.tomorrow_flag   ? `<div style="font-size:12px;color:var(--yellow);margin-bottom:5px">📅 ${resp.tomorrow_flag}</div>` : '';
-      const ra   = resp.recovery_action ? `<div style="font-size:12px;color:var(--blue);margin-bottom:5px">🔋 ${resp.recovery_action}</div>` : '';
+      const tf   = resp.tomorrow_flag   ? `<div style="font-size:12px;color:var(--cardio);margin-bottom:5px">📅 ${resp.tomorrow_flag}</div>` : '';
+      const ra   = resp.recovery_action ? `<div style="font-size:12px;color:var(--swim);margin-bottom:5px">🔋 ${resp.recovery_action}</div>` : '';
       const spo  = resp.spo2_note       ? `<div style="font-size:11px;color:var(--text3);margin-top:6px;padding-top:8px;border-top:1px solid var(--border)">· ${resp.spo2_note}</div>` : '';
       html = hl + note + sc + tf + ra + spo;
     }
@@ -4556,15 +4562,15 @@ function showDayDetail(dateStr) {
   // Lifestyle log
   if(lLog) {
     const parts = [];
-    if(lLog.weight)       parts.push(`⚖️ ${lLog.weight} lbs`);
-    if(lLog.alcohol > 0)  parts.push(`🍺 ${lLog.alcohol} drinks`);
-    if(lLog.caffeine > 0) parts.push(`☕ ${lLog.caffeine} coffees`);
-    if(lLog.meals)        parts.push(`🍽️ ${lLog.meals} meals`);
+    if(lLog.weight)            parts.push(`⚖️ ${lLog.weight} lbs`);
+    if(lLog.etoh > 0)         parts.push(`🍺 ${lLog.etoh} drinks`);
+    if(lLog.caffeineCups > 0) parts.push(`☕ ${lLog.caffeineCups} coffees`);
+    if(lLog.meals)            parts.push(`🍽️ ${lLog.meals} meals`);
     html += `<div style="margin-bottom:16px;padding-top:12px;border-top:1px solid var(--border)">
       <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:8px">Lifestyle</div>
       ${parts.length ? `<div style="display:flex;flex-wrap:wrap;gap:6px">${parts.map(p=>`<span class="badge badge-gray" style="font-size:11px">${p}</span>`).join('')}</div>` : `<div style="font-size:13px;color:var(--text3)">—</div>`}
-      ${lLog.sessionNote ? `<div style="font-size:13px;color:var(--text2);margin-top:10px;line-height:1.5;font-style:italic">"${lLog.sessionNote}"</div>` : ''}
-      ${lLog.acuityNote  ? `<div style="font-size:12px;color:var(--text3);margin-top:6px">Acuity: ${lLog.acuityNote}</div>` : ''}
+      ${lLog.sessionNote ? `<div style="font-size:13px;color:var(--text2);margin-top:10px;line-height:1.5;font-style:italic">"${esc(lLog.sessionNote)}"</div>` : ''}
+      ${lLog.acuityNote  ? `<div style="font-size:12px;color:var(--text3);margin-top:6px">Acuity: ${esc(lLog.acuityNote)}</div>` : ''}
     </div>`;
   }
 
@@ -4836,7 +4842,7 @@ function dismissExportNudge() {
 }
 
 // Start
-const BUILD = 'v16 · ' + new Date().toISOString().slice(11,16);
+const BUILD = 'v17 · ' + new Date().toISOString().slice(11,16);
 try { document.getElementById('build-tag').textContent = 'build ' + BUILD; } catch(e){}
 
 checkFirstRun();
@@ -4854,8 +4860,8 @@ if(getAnthropicKey() && getSheetsKey()) {
 let _waitingSW = null;
 
 // NOTE: REPLACE this each deploy — do not prepend. The modal shows only the current update.
-const UPDATE_VERSION = 'v1.7';
-const UPDATE_NOTES   = `Removed the old unused "What's New" popup. This "App Update Ready" prompt is now the only update notification.`;
+const UPDATE_VERSION = 'v1.8';
+const UPDATE_NOTES   = `Code review fixes: restored colors on the BP card, SpO₂ warning, evening brief, and off-work panel; day-detail now shows alcohol & caffeine; minor recommendation-consistency and safety fixes.`;
 
 function showUpdateModal(worker) {
   _waitingSW = worker;
