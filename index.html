@@ -180,26 +180,6 @@ body{
 .sheet-body{padding:20px}
 
 /* ── What's New modal ────────────────────────────────────── */
-.wn-overlay{
-  position:fixed;inset:0;background:rgba(0,0,0,.8);
-  z-index:500;display:flex;align-items:center;justify-content:center;
-  padding:20px;
-  opacity:0;pointer-events:none;
-  transition:opacity .25s;
-  backdrop-filter:blur(8px);
-}
-.wn-overlay.open{opacity:1;pointer-events:all}
-.wn-card{
-  background:var(--card);
-  border:1px solid var(--border2);
-  border-radius:20px;
-  width:100%;max-width:380px;
-  padding:28px 24px 24px;
-  transform:translateY(16px) scale(.97);
-  transition:transform .3s cubic-bezier(.32,1,.23,1);
-  text-align:center;
-}
-.wn-overlay.open .wn-card{transform:translateY(0) scale(1)}
 
 /* ── Form elements ───────────────────────────────────────── */
 .form-group{margin-bottom:16px}
@@ -4503,7 +4483,6 @@ async function init() {
   step('renderStaticUI',    renderStaticUI);
   step('renderSessionPage', renderSessionPage);
   step('initLogTab',        initLogTab);
-  step('initWhatsNew',      initWhatsNew);
   try { history.replaceState({page:'today'}, '', ''); } catch(e){}
   step('renderTrends',      () => renderTrends(null));
   step('generateDailyBrief',() => generateDailyBrief(false, true)); // cache-only: never pulls API pre-data
@@ -4840,30 +4819,6 @@ function renderNicPage() {
 // ══════════════════════════════════════════════════════════
 //  WHAT'S NEW
 // ══════════════════════════════════════════════════════════
-const APP_VERSION = '1.1';
-const CHANGELOG = {
-  '1.1': `A couple of data fixes landed today.\n\nNicotine tracking (lozenges + patches) and Blood Pressure logs are now fully included when you hit Export Data — previously they were saved locally but silently left out of the JSON. Both blocks will now show up alongside your sessions, lifestyle, and stretch data.\n\nAlso added this update popup so you always know when something changes.`
-};
-
-function initWhatsNew() {
-  const seen = S.get('seen_version');
-  if(seen === APP_VERSION) return;
-  const notes = CHANGELOG[APP_VERSION];
-  if(!notes) return;
-  document.getElementById('wn-version').textContent = `v${APP_VERSION}`;
-  document.getElementById('wn-text').innerHTML = notes.replace(/\n\n/g,'<br><br>').replace(/\n/g,'<br>');
-  setTimeout(() => {
-    document.getElementById('wn-overlay').classList.add('open');
-    document.body.style.overflow = 'hidden';
-  }, 800);
-}
-
-function dismissWhatsNew() {
-  S.set('seen_version', APP_VERSION);
-  document.getElementById('wn-overlay').classList.remove('open');
-  document.body.style.overflow = '';
-}
-
 // ══════════════════════════════════════════════════════════
 //  MONTHLY EXPORT NUDGE
 // ══════════════════════════════════════════════════════════
@@ -4881,7 +4836,7 @@ function dismissExportNudge() {
 }
 
 // Start
-const BUILD = 'v15 · ' + new Date().toISOString().slice(11,16);
+const BUILD = 'v16 · ' + new Date().toISOString().slice(11,16);
 try { document.getElementById('build-tag').textContent = 'build ' + BUILD; } catch(e){}
 
 checkFirstRun();
@@ -4899,8 +4854,8 @@ if(getAnthropicKey() && getSheetsKey()) {
 let _waitingSW = null;
 
 // NOTE: REPLACE this each deploy — do not prepend. The modal shows only the current update.
-const UPDATE_VERSION = 'v1.6';
-const UPDATE_NOTES   = `Cleaned up this update popup — it now shows only the latest change instead of stacking every past update.`;
+const UPDATE_VERSION = 'v1.7';
+const UPDATE_NOTES   = `Removed the old unused "What's New" popup. This "App Update Ready" prompt is now the only update notification.`;
 
 function showUpdateModal(worker) {
   _waitingSW = worker;
@@ -4943,15 +4898,5 @@ if('serviceWorker' in navigator) {
 }
 </script>
 
-<!-- WHAT'S NEW MODAL -->
-<div class="wn-overlay" id="wn-overlay" onclick="dismissWhatsNew()">
-  <div class="wn-card" onclick="event.stopPropagation()">
-    <div style="font-size:36px;margin-bottom:10px">🎉</div>
-    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--swim);margin-bottom:4px">What's New</div>
-    <div style="font-size:11px;color:var(--text3);margin-bottom:16px" id="wn-version"></div>
-    <div style="text-align:left;font-size:14px;color:var(--text2);line-height:1.7;padding:14px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid var(--border);margin-bottom:20px" id="wn-text"></div>
-    <button onclick="dismissWhatsNew()" style="width:100%;padding:14px;border-radius:12px;background:var(--swim);border:none;color:#0D0F14;font-size:15px;font-weight:700;cursor:pointer;letter-spacing:.02em">Got it!</button>
-  </div>
-</div>
 </body>
 </html>
