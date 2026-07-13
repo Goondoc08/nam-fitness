@@ -3810,6 +3810,42 @@ function buildAIContext(data) {
     return `stable (7d avg ${Math.round(avg)}ms)`;
   }
 
+  // ── HRV 30-day rolling baseline — self-updating, never hardcoded ─
+  function getHRVBaseline() {
+    const vals = [];
+    for(let i = 1; i <= 30; i++) {
+      const r = (data.daily || []).find(d => d.date === offsetISO(-i));
+      const v = parseFloat(r?.hrv_ms);
+      if(!isNaN(v) && v > 0) vals.push(v);
+    }
+    if(vals.length < 5) return null;
+    return Math.round(vals.reduce((a,b)=>a+b,0) / vals.length);
+  }
+
+  // ── BB flag — only a true signal, not routine daily fluctuation ─
+  // Same-day wake→current dip after activity is expected and should
+  // never be flagged on its own. Only flag if the wake BB trend itself
+  // is actually declining: today meaningfully below its 7d rolling
+  // average, or 3 consecutive days trending down.
+  function getBBFlag() {
+    const vals = [];
+    for(let i = 1; i <= 7; i++) {
+      const r = (data.daily || []).find(d => d.date === offsetISO(-i));
+      const v = parseFloat(r?.bb_wake);
+      if(!isNaN(v) && v > 0) vals.push(v);
+    }
+    if(vals.length < 5 || bbWake === null) return { flag: false, reason: '' };
+    const avg = vals.reduce((a,b)=>a+b,0) / vals.length;
+    const pctBelow = (avg - bbWake) / avg;
+    if(pctBelow > 0.15) {
+      return { flag: true, reason: `wake BB ${bbWake} is ${Math.round(pctBelow*100)}% below the 7d avg (${Math.round(avg)})` };
+    }
+    if(vals[0] < vals[1] && vals[1] < vals[2]) {
+      return { flag: true, reason: `wake BB declining 3 straight days (${vals[2]}→${vals[1]}→${vals[0]})` };
+    }
+    return { flag: false, reason: '' };
+  }
+
   // ── 7-day lifestyle summary from localStorage ──────────────
   function getWeeklySummary() {
     let totalDrinks = 0, sleepEntries = [], sessionsLogged = 0, bbWakes = [];
@@ -3944,6 +3980,8 @@ function buildAIContext(data) {
 
   const rule        = getBBRule(idx, bb);
   const hrvTrend    = getHRVTrend();
+  const hrvBaseline = getHRVBaseline();
+  const bbFlagInfo  = getBBFlag();
   const weeklySummary = getWeeklySummary();
   const blockAdh    = getBlockAdherence();
 
@@ -3993,11 +4031,12 @@ function buildAIContext(data) {
   const medicalStr = `Sleep study: ${med.sleep_study_status}. BP: ${med.bp_monitoring}. GLP-1: ${med.glp1_dose}. Protein target: ${med.protein_target || '180–200g/day'}. Nicotine: ${med.nicotine_stage}.`;
 
   return {
-    profile: `Nicholas — 39yo firefighter, Pearland TX, 48/96 shift. ~235 lbs, down ~60 lbs. Recomping. Sleep deficit IMPROVING — ~1.6h now vs ~2.5h a year ago (bedtime ~1h earlier, sleep grew from 5h46m to 6h43m/night). Frame sleep as a positive trajectory, not a static chronic deficit. HRV baseline 33–37ms (37ms+ is a strong night, 30ms is now BELOW average, flag under 29). Resting HR 53–55. VO₂ max 36 — target 38 by end of block; running is the ONLY lever that moves VO₂ (swim/lift don't), so 1 run per cycle (min 20 min, GPS) is the active prescription. Running now in rotation (first runs Jun 8 & Jun 22) — not yet a programmed day; track separately from swim SWOLF. BB ceiling ~65–87 on best nights and capped by an unresolved sleep-breathing issue (SpO₂ to 79% floor, sleep study referral pending) — NOT a training problem; never frame the BB cap as overtraining. No overhead pressing — floor press is the permanent substitute. Wife also firefighter on 48/96 starting day after Nicholas — always on shift Nicholas's Cycle Day 3, home from Day 4 morning. Solo parenting Cycle Day 3. Kids in daycare M/W/F 0830–1445. Backup support occasionally available.`,
+    profile: `Nicholas — 39yo firefighter, Pearland TX, 48/96 shift. Recomping — scale weight is not a reliable signal right now; slow upward drift reflects muscle gain, not fat gain, and should never be framed as a setback. Sleep deficit IMPROVING — ~1.6h now vs ~2.5h a year ago (bedtime ~1h earlier, sleep grew from 5h46m to 6h43m/night). Frame sleep as a positive trajectory, not a static chronic deficit. HRV baseline 33–37ms (37ms+ is a strong night, 30ms is now BELOW average, flag under 29). Resting HR 53–55. VO₂ max 36 — target 38 by end of block; running is the ONLY lever that moves VO₂ (swim/lift don't), so 1 run per cycle (min 20 min, GPS) is the active prescription. Running now in rotation (first runs Jun 8 & Jun 22) — not yet a programmed day; track separately from swim SWOLF. BB ceiling ~65–87 on best nights and capped by an unresolved sleep-breathing issue (SpO₂ to 79% floor, sleep study referral pending) — NOT a training problem; never frame the BB cap as overtraining. No overhead pressing — floor press is the permanent substitute. Wife also firefighter on 48/96 starting day after Nicholas — always on shift Nicholas's Cycle Day 3, home from Day 4 morning. Solo parenting Cycle Day 3. Kids in daycare M/W/F 0830–1445. Backup support occasionally available.`,
 
     metrics: `Cycle ${weekNum} of 12. ${blockAdh}.
 Cycle Day ${day.num} — ${day.name}. ${getShiftPosition(idx)}
-BB wake: ${bbWake ?? '—'}${noWakeFlag} | BB current: ${bbCurrent ?? '—'} | HRV: ${hrv ?? '—'}ms${hrvTrend ? ' ('+hrvTrend+')' : ''}
+BB wake: ${bbWake ?? '—'}${noWakeFlag} | BB current: ${bbCurrent ?? '—'} | HRV: ${hrv ?? '—'}ms${hrvTrend ? ' ('+hrvTrend+')' : ''}${hrvBaseline ? ` | 30d HRV baseline: ${hrvBaseline}ms` : ''}
+BB flag: ${bbFlagInfo.flag ? `YES — ${bbFlagInfo.reason}` : 'No — normal range, do not call out'}
 Sleep: ${sleepHrs ?? '—'} hrs · score ${sleepScore ?? '—'}/100 · deep ${deepMin ?? '—'} min · REM ${remMin ?? '—'} min${noSleepFlag}
 Readiness: ${readiness} | Status: ${status} | VO₂: ${vo2} | Resting HR: ${restHR} | Stress: ${stress}
 ${weeklySummary}`,
@@ -4077,7 +4116,9 @@ async function generateDailyBrief(forceRefresh = false, cacheOnly = false) {
   const isNoWake = period.includes('no_wake');
   const isNoSlp  = period.includes('no_sleep');
 
-  const systemPrompt = `You are Nicholas's personal fitness coach. You know him well — 39yo firefighter, 48/96 rotation, down 60 lbs, recomping. Sleep deficit is shrinking and trending positive — frame it as progress, not a static chronic problem. HRV baseline 33–37ms (flag under 29; 34ms is normal now, not "strong"). Resting HR 53–55. VO₂ 36, climbing toward 38 — running is the only lever that moves it. BB ceiling (~65–87) is capped by an unresolved sleep-breathing issue (SpO₂ to 79%, sleep study pending), NOT by training load — never frame the BB cap as overtraining or a training problem.
+  const systemPrompt = `You are Nicholas's personal fitness coach. You know him well — 39yo firefighter, 48/96 rotation, recomping — scale weight is not a reliable signal right now; some upward drift is muscle gain, not a setback. Sleep deficit is shrinking and trending positive — frame it as progress, not a static chronic problem. HRV baseline 33–37ms (flag under 29; 34ms is normal now, not "strong") — treat this as a starting point only, the live trend/baseline figures in METRICS are the current source of truth. Resting HR 53–55. VO₂ 36, climbing toward 38 — running is the only lever that moves it. BB ceiling (~65–87) is capped by an unresolved sleep-breathing issue (SpO₂ to 79%, sleep study pending), NOT by training load — never frame the BB cap as overtraining or a training problem.
+
+Vary your phrasing and structure every time — do not reuse the same openers, framing, or stock lines call to call. Each note should read as freshly written, not templated.
 ${ctx.offWorkCtx ? `\n🚫 ACTIVE OVERRIDE: ${ctx.offWorkCtx} Do NOT mention station, shift, calls, fire department, or work schedule anywhere in your response. He is home with full schedule flexibility.\n` : ''}
 Respond ONLY with valid JSON — no markdown fences, no prose outside the JSON.
 
@@ -4097,8 +4138,8 @@ ${isMorn ? `Morning schema:
 }`}
 
 ${isMorn
-  ? `Morning rules: last_night leads with the quality split (score, hours, deep, REM) and what it means — not just the numbers. capacity gives a clear load verdict. today_session is exact — name the movement, load, and location; it is the PLAN for today, never state or imply it is already done. If off work drop all station/shift/call refs and use home/gym framing. this_week is one sharp adherence read of the current 6-day cycle. tomorrow previews the session type and the key metric threshold. spo2_note: SpO2 is a known chronic issue with a sleep study pending — mention it only if there is a specific action for today; never explain the problem at length.${isNoWake ? ' Wake BB unavailable — use readiness/HRV instead.' : ''}${isNoSlp ? ' Sleep data unavailable — do not cite sleep score or hours as fact.' : ''}`
-  : `Evening rules: headline states his condition right now. note flows as prose. CRITICAL — obey SESSION STATUS TODAY exactly: if COMPLETED, open by acknowledging the session he did; if NOT LOGGED, you must NOT claim or imply he trained — say plainly the session isn't logged, then decide based on bb_current (his state right now): if bb_current is reasonable, give a brief "if you can still get it in tonight" nudge with the specific session; if bb_current is low enough that training would dig into reserves (roughly under 30), recommend shifting it to tomorrow instead. Never infer completion from the recommendation card. Then name the single biggest recovery lever for tonight, preview tomorrow's session and BB threshold, and close with one concrete bedtime action. If returning to shift tomorrow, call it out explicitly. spo2_note: only if actionable tonight, never a lengthy explanation. BB: use bb_current as his state right now — bb_wake was the morning starting point and drives workout tiers only. If they differ meaningfully, you may note the drop (e.g. "started at 98, now at 43") but always close on the current value.`}
+  ? `Morning rules: last_night leads with the quality split (score, hours, deep, REM) and what it means — not just the numbers. capacity gives a clear load verdict. today_session is exact — name the movement, load, and location; it is the PLAN for today, never state or imply it is already done. If off work drop all station/shift/call refs and use home/gym framing. this_week is one sharp adherence read of the current 6-day cycle. tomorrow previews the session type and the key metric threshold. spo2_note: SpO2 is a known chronic issue with a sleep study pending — mention it only if there is a specific action for today; never explain the problem at length.${isNoWake ? ' Wake BB unavailable — use readiness/HRV instead.' : ''}${isNoSlp ? ' Sleep data unavailable — do not cite sleep score or hours as fact.' : ''} BB: wake BB drives today's session tier — normal context, not a concern by default. Only frame it as a warning sign if BB flag in METRICS is YES.`
+  : `Evening rules: headline states his condition right now. note flows as prose. CRITICAL — obey SESSION STATUS TODAY exactly: if COMPLETED, open by acknowledging the session he did; if NOT LOGGED, you must NOT claim or imply he trained — say plainly the session isn't logged, then decide based on bb_current (his state right now): if bb_current is reasonable, give a brief "if you can still get it in tonight" nudge with the specific session; if bb_current is low enough that training would dig into reserves (roughly under 30), recommend shifting it to tomorrow instead. Never infer completion from the recommendation card. Then name the single biggest recovery lever for tonight, preview tomorrow's session and BB threshold, and close with one concrete bedtime action. If returning to shift tomorrow, call it out explicitly. spo2_note: only if actionable tonight, never a lengthy explanation. BB: use bb_current as his state right now — bb_wake was the morning starting point and drives workout tiers only. A same-day wake-to-current dip is normal after activity and should NOT be called out by default. Only mention a BB concern, and only then, if BB flag in METRICS is YES — use the given reason, don't invent your own.`}
 
 No motivational filler. No generic advice. Write like you have been coaching him for months.`;
 
