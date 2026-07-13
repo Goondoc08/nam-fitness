@@ -114,6 +114,17 @@ Then set Block 3's pace. That's the "see where we're approaching" checkpoint.
 
 ## App Updates for Block 2
 
+> **BUILD STATUS (Jul 12) — staged on git branch `block-2`, NOT merged/pushed. `main` is frozen so the live app runs Block 1 untouched for the last 10 days.** Already built & committed on the branch: BLOCK_START→Jul 23, cycle-variant engine (accessory Deck A/B + Day 2 machine deck alternation), run-owed badge + evening-note nag, foam-roll + plank 60s, VO₂ copy, sw.js v18 / build v18 / update modal v2.0. Syntax-checked; date math verified (Jul 23 = Cycle 1/Day 1/Deck A, decks alternate A→B→A). NOT yet verified on-device with live data — that happens on the 22nd.
+>
+> **Rollover runbook (night of Jul 22, ~15 min, together):**
+> 1. Finish + log the final Mobility session (Block 1 Cycle 12 Day 6).
+> 2. **Export Data → save the JSON** (Block 1's permanent record — must happen BEFORE the merge, since adherence recomputes off BLOCK_START).
+> 3. `git checkout main && git merge block-2` in the NAM Fitness folder.
+> 4. `git push origin main` → wait ~1–2 min for GitHub Pages.
+> 5. On the phone: reload, tap "Reload & Apply" on the v2.0 update banner. Confirm build tag reads **v18**, badge row shows the 🏃 pill, and Session shows Deck A accessories.
+> 6. Spot-check: open Lift A and Lift B detail, confirm the new accessories; open Day 2, confirm treadmill deck (Cycle 1 = odd = Deck A).
+
+
 **Must do (rollover, Jul 22–23):**
 1. New `BLOCK_START` / `ANCHOR` constants (index.html:~1458) — anchor Cycle Day 1 to an actual shift day.
 2. **Export Data** before rollover — Block 1's permanent record (adherence derives from `BLOCK_START`).
