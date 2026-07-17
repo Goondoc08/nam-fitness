@@ -2627,6 +2627,31 @@ function recentLifts(session, max=8) {
   return out;
 }
 
+// ── Plate loading helper (45 lb bar, standard + 35s) ────────
+const PLATES = [45,35,25,10,5,2.5];
+function fmtPlate(n) { return n % 1 === 0 ? String(n) : n.toFixed(1); }
+function plateLoadLabel(totalWeight) {
+  const w = parseFloat(totalWeight);
+  if(!w || w <= 45) return 'bar only';
+  let remaining = Math.round(((w - 45) / 2) / 2.5) * 2.5;
+  const plates = [];
+  for(const p of PLATES) {
+    while(remaining >= p - 0.01) {
+      plates.push(p);
+      remaining = Math.round((remaining - p) * 100) / 100;
+    }
+  }
+  if(!plates.length) return 'bar only';
+  let label = plates.map(fmtPlate).join(' + ') + ' / side';
+  if(remaining > 0.01) label += ` (+${fmtPlate(remaining)} short)`;
+  return label;
+}
+function updatePlateHelper(key) {
+  const input  = document.getElementById(`li_${key}`);
+  const helper = document.getElementById(`li_${key}_plate`);
+  if(input && helper) helper.textContent = plateLoadLabel(input.value);
+}
+
 function renderLiftLogger(liftKey) {
   activeLiftSession = liftKey;
   const defs   = LIFT_DEFS[liftKey];
@@ -2646,8 +2671,10 @@ function renderLiftLogger(liftKey) {
     return `<div class="lift-cell">
       <div class="lift-cell-name">${d.name}</div>
       <input type="number" class="lift-input" id="li_${d.key}"
-        value="${target}" step="2.5" min="0" inputmode="decimal">
+        value="${target}" step="2.5" min="0" inputmode="decimal"
+        oninput="updatePlateHelper('${d.key}')">
       <div class="lift-unit">${todayVal !== undefined ? 'lbs · logged' : 'lbs · target'}</div>
+      <div class="lift-plate" id="li_${d.key}_plate" style="font-size:11px;font-weight:600;color:var(--lift);margin-top:2px">${plateLoadLabel(target)}</div>
       ${showLast ? `<div class="lift-adv" style="color:var(--text3)">Last: ${lastVal} lbs</div>` : ''}
       ${d.adv && !showLast ? `<div class="lift-adv">${d.adv}</div>` : ''}
     </div>`;
