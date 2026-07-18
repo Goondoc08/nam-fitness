@@ -3511,6 +3511,7 @@ function notePeriod() {
   const h = new Date().getHours();
   if(h >= 20) return 'evening';
   if(h < 5)   return null; // overnight — no note yet
+  if(h < 8)   return 'waiting'; // firm floor — Garmin sync isn't reliably complete before 0800
 
   const snap      = sheetDataGlobal?.snap || {};
   const hasBBWake = !isNaN(parseFloat(snap.bb_wake));
@@ -4139,7 +4140,7 @@ ${isMorn ? `Morning schema:
 
 ${isMorn
   ? `Morning rules: last_night leads with the quality split (score, hours, deep, REM) and what it means — not just the numbers. capacity gives a clear load verdict. today_session is exact — name the movement, load, and location; it is the PLAN for today, never state or imply it is already done. If off work drop all station/shift/call refs and use home/gym framing. this_week is one sharp adherence read of the current 6-day cycle. tomorrow previews the session type and the key metric threshold. spo2_note: SpO2 is a known chronic issue with a sleep study pending — mention it only if there is a specific action for today; never explain the problem at length.${isNoWake ? ' Wake BB unavailable — use readiness/HRV instead.' : ''}${isNoSlp ? ' Sleep data unavailable — do not cite sleep score or hours as fact.' : ''} BB: wake BB drives today's session tier — normal context, not a concern by default. Only frame it as a warning sign if BB flag in METRICS is YES.`
-  : `Evening rules: headline states his condition right now. note flows as prose. CRITICAL — obey SESSION STATUS TODAY exactly: if COMPLETED, open by acknowledging the session he did; if NOT LOGGED, you must NOT claim or imply he trained — say plainly the session isn't logged, then decide based on bb_current (his state right now): if bb_current is reasonable, give a brief "if you can still get it in tonight" nudge with the specific session; if bb_current is low enough that training would dig into reserves (roughly under 30), recommend shifting it to tomorrow instead. Never infer completion from the recommendation card. Then name the single biggest recovery lever for tonight, preview tomorrow's session and BB threshold, and close with one concrete bedtime action. If returning to shift tomorrow, call it out explicitly. spo2_note: only if actionable tonight, never a lengthy explanation. BB: use bb_current as his state right now — bb_wake was the morning starting point and drives workout tiers only. A same-day wake-to-current dip is normal after activity and should NOT be called out by default. Only mention a BB concern, and only then, if BB flag in METRICS is YES — use the given reason, don't invent your own.`}
+  : `Evening rules: headline states his condition right now. note flows as prose. CRITICAL — obey SESSION STATUS TODAY exactly: if COMPLETED, open by acknowledging the session he did today — say "today", never "this morning" or any other specific time of day, since the session may have been logged at any point in the day; if NOT LOGGED, you must NOT claim or imply he trained — say plainly the session isn't logged, then decide based on bb_current (his state right now): if bb_current is reasonable, give a brief "if you can still get it in tonight" nudge with the specific session; if bb_current is low enough that training would dig into reserves (roughly under 30), recommend shifting it to tomorrow instead. Never infer completion from the recommendation card. Then name the single biggest recovery lever for tonight, preview tomorrow's session and BB threshold, and close with one concrete bedtime action. If returning to shift tomorrow, call it out explicitly. spo2_note: only if actionable tonight, never a lengthy explanation. BB: use bb_current as his state right now — bb_wake was the morning starting point and drives workout tiers only. A same-day wake-to-current dip is normal after activity and should NOT be called out by default. Only mention a BB concern, and only then, if BB flag in METRICS is YES — use the given reason, don't invent your own.`}
 
 No motivational filler. No generic advice. Write like you have been coaching him for months.`;
 
@@ -4883,7 +4884,7 @@ function dismissExportNudge() {
 }
 
 // Start
-const BUILD = 'v17 · ' + new Date().toISOString().slice(11,16);
+const BUILD = 'v18 · ' + new Date().toISOString().slice(11,16);
 try { document.getElementById('build-tag').textContent = 'build ' + BUILD; } catch(e){}
 
 checkFirstRun();
