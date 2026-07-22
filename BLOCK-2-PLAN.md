@@ -15,6 +15,20 @@ Expect ~3 more "climb" blocks to reach the strength standards and VO₂ 42, then
 
 ---
 
+## Block 1 Review Adjustments (applied Jul 22, day of rollover — build v19)
+
+A full Block 1 review (72 days, Cycles 3–12 logged) surfaced several findings that changed Block 2 before it started. Applied same-day as the rollover, on top of the original build:
+
+1. **Lift B is a Day 4–5 window, Day 5 default.** Block 1 data: Lift B completed 10/10 cycles but landed on the written Day 4 only 4/10 times — Day 5 absorbed it 5/10 with zero downside (deadlift +70 lbs across the block regardless). Day 4 was framed as "most protected — above all others," which created guilt over shifts that weren't actually failures. Reframed: both days count equally, no penalty for shifting.
+2. **Floor press moved off linear load progression, onto reps.** Six weeks flat at 60–65 lbs while every other lift climbed +5/session cleanly — the shoulder was setting the ceiling, not strength. It's the only lift where "+5" was a joint decision, not a training one. Now: weight **holds** (logger no longer suggests +5), a new **reps/set** field tracks progression instead (5→6→7...), and the weight field stays fully open to raise manually the moment the shoulder allows it. The original 85–95 lb target is retired.
+3. **Day 2's lowest BB tier floor lowered 20/15 min → 10 min** (both machine decks). Day 2 was the most-skipped session in Block 1 (50% completion) and almost never for BB reasons — it was post-shift exhaustion meeting a floor that felt too big to start. A 10-minute floor is more likely to actually happen.
+4. **Swim goal marked met / maintenance.** SWOLF target was 45–47; best logged was 44 (7/15). Swim is no longer a growth lever for Block 2 — hold the number, revisit only if a new stretch goal is wanted later.
+5. **Bedtime target (22:45–23:00) added to the coach's medical context.** Sleep *efficiency* improved all block (BB restoration 34.5→51.7) but sleep *duration* got worse in the final third (6.47h, the block's worst) because bedtime drifted 25 minutes later — the efficiency gain was being spent on staying up later instead of banked as recovery. The evening coach note now has a concrete number to anchor its "tonight's bedtime action" line to.
+
+**Confirmed unchanged from the original plan** (the review validated these, no edit needed): the stall rule (2 misses → −10%) and Cycle 7 deload already covered the review's "plan for the first real stall" finding; the run-owed badge already turns the floating VO₂ run into a tracked fixture rather than an optional add-on, which is what the review was asking for.
+
+---
+
 ## Where Block 1 Ends (the evidence)
 
 - VO₂ 36.5 (from ~34). Training status Productive, ACWR 0.9 optimal, zero overreaching in 10 cycles.
