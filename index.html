@@ -718,6 +718,7 @@ input:checked ~ .toggle-slider-orange::before{background:var(--orange);transform
     <div class="badge badge-gray" id="cycle-badge">Day — of 6</div>
     <div class="badge badge-gray" id="week-badge">Cycle — of 12</div>
     <div class="badge badge-gray" id="shift-badge">—</div>
+    <div class="badge badge-gray" id="run-badge" style="display:none;cursor:pointer" onclick="showPage('session')">—</div>
   </div>
   <div id="off-work-strip" style="margin-bottom:12px"></div>
 
@@ -1196,7 +1197,7 @@ input:checked ~ .toggle-slider-orange::before{background:var(--orange);transform
     </div>
     <div style="font-size:12px;color:var(--text3);margin-top:6px" id="vo2-trend-date"></div>
     <div style="font-size:13px;color:var(--text2);line-height:1.6;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)" id="vo2-context">
-      Target 38 mL/kg/min by Cycle 12 (already past the original 34–35). Running is the only lever — aim for 1 run per cycle, min 20 min with GPS. Garmin updates VO₂ from outdoor GPS runs, treadmill with chest strap, or cycling with power meter — not from swimming or lifting.
+      Block 2 target 37.5–38.5 mL/kg/min — hold the slope, don't force it. Long-term 42+ (fire-service floor for safe fireground work). Running is the only lever — 1 GPS run per cycle, min 20 min. Garmin updates VO₂ from outdoor GPS runs, treadmill with chest strap, or cycling with power meter — not from swimming or lifting.
     </div>
   </div>
 
@@ -1456,7 +1457,7 @@ const TAB_DAILY         = 'NAM Fitness — Garmin Daily Log';
 const TAB_SNAPSHOT      = 'NAM Fitness — Current Snapshot';
 const TAB_ACTIVITIES    = 'NAM Fitness — Activity Log';
 const ANCHOR            = new Date(2026, 4, 24); // May 24 2026 — cycle anchor
-const BLOCK_START       = new Date(2026, 4, 12); // May 12 2026 — block start (week 1)
+const BLOCK_START       = new Date(2026, 6, 23); // Jul 23 2026 — BLOCK 2 start (Cycle Day 1 / shift day; Block 1 = May 12, exported at rollover)
 const TRACKING_START    = new Date(2026, 4, 31); // May 31 2026 — first day of active app use
 const WEEK_TOTAL        = 12;
 const DAYCARE_START     = '2026-06-09'; // M/W/F 0830–1445 from this date forward
@@ -1870,6 +1871,47 @@ function renderStaticUI() {
   document.getElementById('session-sub').textContent = `${day.name} · Day ${day.num} of 6`;
 
   renderOffWorkStrip();
+  renderRunBadge();
+}
+
+// ══════════════════════════════════════════════════════════
+//  RUN-OWED BADGE (Block 2 — floating 1 GPS run / cycle)
+//  "Done" if EITHER a Garmin run showed up in a snapshot this cycle (persisted
+//  as nam_run_done_<date>) OR a VO₂ Max on-demand session was logged. Escalates
+//  Cycle Day 4–5, auto-resets at Cycle Day 1.
+// ══════════════════════════════════════════════════════════
+const RUN_ACT_RE = /\brun|jog/i;
+function isRunActivity(a) {
+  return RUN_ACT_RE.test(a?.activity_name || '') || RUN_ACT_RE.test(a?.raw_type || '');
+}
+function markRunFromActivities(activities) {
+  if(Array.isArray(activities) && activities.some(isRunActivity)) {
+    if(!S.get('run_done_' + todayISO())) S.set('run_done_' + todayISO(), new Date().toISOString());
+  }
+}
+function isRunLoggedOn(ds) {
+  return !!S.get('run_done_' + ds) || !!S.getJSON('on_demand_log_vo2_max_' + ds);
+}
+function runDoneThisCycle() {
+  const idx = getCycleIdx();               // 0 = Cycle Day 1
+  for(let i = 0; i <= idx; i++) {
+    if(isRunLoggedOn(offsetISO(-i))) return true;
+  }
+  return false;
+}
+function renderRunBadge() {
+  const el = document.getElementById('run-badge');
+  if(!el) return;
+  const idx      = getCycleIdx();          // 0..5
+  const daysLeft = 5 - idx;                // Cycle Day 6 is the last chance
+  let cls, txt;
+  if(runDoneThisCycle()) { cls = 'badge-green';  txt = '🏃 Run done ✓'; }
+  else if(idx <= 2)      { cls = 'badge-gray';   txt = '🏃 Run owed'; }
+  else if(idx <= 4)      { cls = 'badge-orange'; txt = `🏃 Run owed · ${daysLeft} day${daysLeft>1?'s':''} left`; }
+  else                   { cls = 'badge-red';    txt = '🏃 No run yet — last day'; }
+  el.className = 'badge ' + cls;
+  el.textContent = txt;
+  el.style.display = '';
 }
 
 // ══════════════════════════════════════════════════════════
@@ -2091,6 +2133,10 @@ function renderMetrics(data) {
     }).join('');
   }
 
+  // Persist any Garmin run in today's snapshot, then refresh the run-owed badge
+  markRunFromActivities(activities);
+  renderRunBadge();
+
   renderBPCard();
 }
 
@@ -2303,6 +2349,7 @@ const WORKOUT_DETAIL = [
           {n:'Row or bike',        s:'5 min · easy pace'},
           {n:'Hip circles',        s:'10 × each direction'},
           {n:'Goblet squat',       s:'2 × 10 · bodyweight'},
+          {n:'Foam roll',          s:'TFL + outer quad · 60 sec / side · knee'},
           {n:'Squat ramp',         s:'', ramp:{session:'liftA', key:'squat', def:110}},
         ]},
         { head:'Main Lifts · 5×5', cls:'sh-main', items:[
@@ -2327,6 +2374,7 @@ const WORKOUT_DETAIL = [
           {n:'Row or bike',        s:'5 min · easy pace'},
           {n:'Hip circles',        s:'10 × each direction'},
           {n:'Goblet squat',       s:'2 × 10 · bodyweight'},
+          {n:'Foam roll',          s:'TFL + outer quad · 60 sec / side · knee'},
           {n:'Squat ramp',         s:'', ramp:{session:'liftA', key:'squat', def:110}},
         ]},
         { head:'Main Lifts · 5×5', cls:'sh-main', items:[
@@ -2450,9 +2498,104 @@ const WORKOUT_DETAIL = [
       { label:'Option C · guided', name:'Recovery Yoga', color:'var(--mobility)',
         items:['20–25 min YouTube flow','Tags: "recovery" / "gentle" / "firefighter stretch"'] },
     ],
-    note:'Do this with your wife. The ritual of Day 6 prep before every tour is as valuable as the movements themselves.',
+    note:'Add foam roll TFL + outer quad, 60 sec / side (knee / IT-band release). Do this with your wife — the ritual of Day 6 prep before every tour is as valuable as the movements themselves.',
   },
 ];
+
+// ══════════════════════════════════════════════════════════
+//  BLOCK 2 — CYCLE VARIANTS (accessories + Day 2 machine alternate by cycle)
+//  Deck A = ODD cycles, Deck B = EVEN cycles. Main 5×5 never changes.
+//  Resolved once in init() via applyCycleVariants() → mutates WORKOUT_DETAIL /
+//  BB_RULES in place so every downstream reader is unchanged.
+// ══════════════════════════════════════════════════════════
+const LIFTA_ACC = {
+  A: [
+    {n:'Farmer carries',  s:'3 × 50 ft · heavy · 90 sec rest'},
+    {n:'Cable row',       s:'3 × 12'},
+    {n:'Tricep pushdown', s:'3 × 12'},
+    {n:'Hammer curls',    s:'3 × 10'},
+    {n:'Plank',           s:'3 × 60 sec'},
+  ],
+  B: [
+    {n:'Chest-supported DB row', s:'3 × 12'},
+    {n:'Banded lateral walk',    s:'3 × 15 / side · glute med (knee)'},
+    {n:'DB skull crusher',       s:'3 × 12'},
+    {n:'Incline DB curls',       s:'3 × 10'},
+    {n:'Pallof press',           s:'3 × 10 / side'},
+  ],
+};
+const LIFTB_ACC = {
+  A: [
+    {n:'KB Romanian deadlift',      s:'3 × 10 · hinge focus'},
+    {n:'Face pull',                 s:'3 × 15 · cable'},
+    {n:'Machine external rotation', s:'3 × 12 / side · cuff · pain-free'},
+    {n:'Dead bug',                  s:'3 × 10 / side'},
+  ],
+  B: [
+    {n:'Single-leg RDL',      s:'3 × 8 / side'},
+    {n:'Machine reverse fly', s:'3 × 15'},
+    {n:'Cable pull-through',  s:'3 × 12 · glute'},
+    {n:'Cable woodchop',      s:'3 × 10 / side'},
+  ],
+};
+const DAY2_DECKS = {
+  A: { // treadmill (odd cycles)
+    rules: [
+      {max:19, opt:'Option A',   desc:'10 min mobility + 20 min easy treadmill ~60% max HR (Z1: 93–111 bpm). No lifting.'},
+      {max:34, opt:'Option B ✓', desc:'30–35 min treadmill conversational ~65% max HR, 1–2% incline (Z2: 112–129 bpm).'},
+      {max:999,opt:'Option C',   desc:'Rower intervals — 5×3 min ~70%, 2 min rest, ~25 min total. No lifting — absolute Day 2 rule.'},
+    ],
+    options: [
+      { label:'Option A · BB under 20', name:'Mobility + Zone 1', color:'var(--cardio)',
+        items:['10 min mobility — hip flexors, thoracic, calves','20 min treadmill easy — ~60% max HR','Z1: 93–111 bpm · no lifting'],
+        note:'Post-shift sleep deprivation drain. Moving is enough.' },
+      { label:'Option B · BB 20–35 · default', name:'Zone 2 Treadmill', color:'var(--cardio)', recommended:true,
+        items:['30–35 min treadmill · conversational pace','~65% max HR · 1–2% incline','Z2: 112–129 bpm · no lifting'],
+        note:'No lifting on Day 2 regardless — absolute rule. Respects interrupted shift sleep.' },
+      { label:'Option C · BB 35+', name:'Rower Intervals', color:'var(--orange)',
+        items:['5 × 3 min moderate effort · ~70%','2 min easy row rest between sets','~25 min total · no lifting'],
+        note:'Only when genuinely recovered. Still no lifting on Day 2.' },
+    ],
+  },
+  B: { // rower-led (even cycles) — station has treadmill + rower only
+    rules: [
+      {max:19, opt:'Option A',   desc:'10 min mobility + 15 min easy row. Z1 · no lifting.'},
+      {max:34, opt:'Option B ✓', desc:'25–30 min steady Z2 row (~22 strokes/min), conversational. No lifting.'},
+      {max:999,opt:'Option C',   desc:'Row intervals — 6×2 min moderate, 90 sec easy between, ~20 min. No lifting — absolute Day 2 rule.'},
+    ],
+    options: [
+      { label:'Option A · BB under 20', name:'Mobility + Easy Row', color:'var(--cardio)',
+        items:['10 min mobility — hip flexors, thoracic, calves','15 min easy row — Z1, relaxed','No lifting'],
+        note:'Post-shift drain. Moving is enough — rower is kind to tired legs.' },
+      { label:'Option B · BB 20–35 · default', name:'Steady Z2 Row', color:'var(--cardio)', recommended:true,
+        items:['25–30 min steady row','~22 strokes/min · conversational','Z2 · no lifting'],
+        note:'No lifting on Day 2 regardless — absolute rule. Respects interrupted shift sleep.' },
+      { label:'Option C · BB 35+', name:'Row Intervals', color:'var(--orange)',
+        items:['6 × 2 min moderate row · ~70%','90 sec easy row between','~20 min total · no lifting'],
+        note:'Only when genuinely recovered. Still no lifting on Day 2.' },
+    ],
+  },
+};
+function currentDeck() { return getWeekNum() % 2 === 1 ? 'A' : 'B'; }
+function applyAccDeck(detail, deckItems, deckName) {
+  if(!detail || !detail.modes) return;
+  ['full','modified'].forEach(mode => {
+    const secs = detail.modes[mode];
+    if(!secs) return;
+    const accSec = secs.find(s => s.cls === 'sh-accessories');
+    if(accSec) {
+      accSec.head  = `Accessories · Deck ${deckName}`;
+      accSec.items = mode === 'modified' ? deckItems.slice(0, 2) : deckItems.slice();
+    }
+  });
+}
+function applyCycleVariants() {
+  const deck = currentDeck();
+  applyAccDeck(WORKOUT_DETAIL[0], LIFTA_ACC[deck], deck);
+  applyAccDeck(WORKOUT_DETAIL[3], LIFTB_ACC[deck], deck);
+  if(WORKOUT_DETAIL[1]) WORKOUT_DETAIL[1].options = DAY2_DECKS[deck].options;
+  BB_RULES[1] = DAY2_DECKS[deck].rules;
+}
 
 // ══════════════════════════════════════════════════════════
 //  LIFT LOGGING
@@ -2484,6 +2627,31 @@ function recentLifts(session, max=8) {
   return out;
 }
 
+// ── Plate loading helper (45 lb bar, standard + 35s) ────────
+const PLATES = [45,35,25,10,5,2.5];
+function fmtPlate(n) { return n % 1 === 0 ? String(n) : n.toFixed(1); }
+function plateLoadLabel(totalWeight) {
+  const w = parseFloat(totalWeight);
+  if(!w || w <= 45) return 'bar only';
+  let remaining = Math.round(((w - 45) / 2) / 2.5) * 2.5;
+  const plates = [];
+  for(const p of PLATES) {
+    while(remaining >= p - 0.01) {
+      plates.push(p);
+      remaining = Math.round((remaining - p) * 100) / 100;
+    }
+  }
+  if(!plates.length) return 'bar only';
+  let label = plates.map(fmtPlate).join(' + ') + ' / side';
+  if(remaining > 0.01) label += ` (+${fmtPlate(remaining)} short)`;
+  return label;
+}
+function updatePlateHelper(key) {
+  const input  = document.getElementById(`li_${key}`);
+  const helper = document.getElementById(`li_${key}_plate`);
+  if(input && helper) helper.textContent = plateLoadLabel(input.value);
+}
+
 function renderLiftLogger(liftKey) {
   activeLiftSession = liftKey;
   const defs   = LIFT_DEFS[liftKey];
@@ -2503,8 +2671,10 @@ function renderLiftLogger(liftKey) {
     return `<div class="lift-cell">
       <div class="lift-cell-name">${d.name}</div>
       <input type="number" class="lift-input" id="li_${d.key}"
-        value="${target}" step="2.5" min="0" inputmode="decimal">
+        value="${target}" step="2.5" min="0" inputmode="decimal"
+        oninput="updatePlateHelper('${d.key}')">
       <div class="lift-unit">${todayVal !== undefined ? 'lbs · logged' : 'lbs · target'}</div>
+      <div class="lift-plate" id="li_${d.key}_plate" style="font-size:11px;font-weight:600;color:var(--lift);margin-top:2px">${plateLoadLabel(target)}</div>
       ${showLast ? `<div class="lift-adv" style="color:var(--text3)">Last: ${lastVal} lbs</div>` : ''}
       ${d.adv && !showLast ? `<div class="lift-adv">${d.adv}</div>` : ''}
     </div>`;
@@ -4057,6 +4227,9 @@ Recommendation: "${tomorrowRule.opt}" — ${tomorrowRule.desc}`,
     sessionNotes:  notesStr,
     sessionStatus: sessionStatus,
     medical:       medicalStr,
+    runStatus:     runDoneThisCycle()
+      ? 'Floating run: DONE this cycle.'
+      : `Floating run: OWED this cycle — Cycle Day ${getCycleIdx()+1} of 6, ${5-getCycleIdx()} day(s) before it resets. On Cycle Day 4+ if still owed, nudge him to fit an easy GPS run in before the cycle closes (any day, 20+ min). Do NOT nudge if it's already done or it's only Cycle Day 1–3.`,
     offWorkCtx,
   };
 }
@@ -4170,6 +4343,8 @@ ${ctx.todayActs}
 
 ${ctx.liftWeights}
 LIFT HISTORY: ${ctx.liftHistory}
+
+RUN STATUS: ${ctx.runStatus}
 
 PRINCIPLE: Body Battery over schedule. Sleep over training. Longevity is the goal.`;
 
@@ -4527,6 +4702,7 @@ async function init() {
   // Each step wrapped + labelled so a single failure can't blank the page
   // and we can see exactly which one broke.
   const step = (label, fn) => { try { fn(); } catch(e){ console.error(label, e); surfaceError('Crash in ' + label, e.message); } };
+  step('applyCycleVariants',applyCycleVariants);
   step('initOffWork',       initOffWork);
   step('renderStaticUI',    renderStaticUI);
   step('renderSessionPage', renderSessionPage);
@@ -4902,8 +5078,8 @@ if(getAnthropicKey() && getSheetsKey()) {
 let _waitingSW = null;
 
 // NOTE: REPLACE this each deploy — do not prepend. The modal shows only the current update.
-const UPDATE_VERSION = 'v1.8';
-const UPDATE_NOTES   = `Code review fixes: restored colors on the BP card, SpO₂ warning, evening brief, and off-work panel; day-detail now shows alcohol & caffeine; minor recommendation-consistency and safety fixes.`;
+const UPDATE_VERSION = 'v2.0 · Block 2';
+const UPDATE_NOTES   = `Block 2 begins. VO₂ target 37.5–38.5 (long-term 42+). Accessories now alternate every cycle — Deck A on odd cycles, Deck B on even — to stay fresh; main 5×5 unchanged. Day 2 recovery alternates treadmill/rower deck. New glute-med + foam-roll work for the knee, controlled shoulder work on Lift B. New 🏃 run-owed badge tracks your 1 floating run per cycle and nudges you if it's still owed late in the cycle.`;
 
 function showUpdateModal(worker) {
   _waitingSW = worker;
