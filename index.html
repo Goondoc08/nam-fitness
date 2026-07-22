@@ -1600,6 +1600,7 @@ function getMedical() {
     protein_target:'180–200g/day',
     nicotine_stage:'~9 lozenges/day, patch trial ongoing',
     bp_monitoring:'active — morning avg ~127/79 (borderline elevated); PCP visit pending, discuss alongside sleep study (apnea + BP linked)',
+    bedtime_target:'22:45–23:00 — Block 1 review: sleep efficiency improved a lot but bedtime drifted 25 min later and total sleep duration got WORSE in the final third (6.47h, worst of the block) despite better quality. Pull bedtime back; do not let the efficiency gain get spent on staying up later.',
     pcp_last_visit:'', notes:''
   };
 }
@@ -2214,7 +2215,7 @@ const BB_RULES = [
   [
     {max:34, opt:'🚫 Skip',      desc:'Do not lift. BB under 35 = skip Lift B. Mobility + light walk instead. Skipping is correct.'},
     {max:44, opt:'Standard',     desc:'Lift B as written. Hold weights — no progression. 5×5 DL / Floor Press / Lat Pull + EMOM.'},
-    {max:999,opt:'✅ Full + Progress', desc:'Full session cleared. Progression appropriate if last Lift B was clean. Advance DL / FP.'},
+    {max:999,opt:'✅ Full + Progress', desc:'Full session cleared. Progression appropriate if last Lift B was clean. Advance DL — floor press progresses via reps, not weight.'},
   ],
   // Day 5 — Swim Build
   [
@@ -2396,8 +2397,8 @@ const WORKOUT_DETAIL = [
   {
     options:[
       { label:'Option A · BB under 20', name:'Mobility + Zone 1', color:'var(--cardio)',
-        items:['10 min mobility — hip flexors, thoracic, calves','20 min treadmill easy — ~60% max HR','Z1: 93–111 bpm · no lifting'],
-        note:'Post-shift sleep deprivation drain. Moving is enough.' },
+        items:['10 min mobility — hip flexors, thoracic, calves','10 min treadmill easy — ~60% max HR','Z1: 93–111 bpm · no lifting'],
+        note:'Post-shift sleep deprivation drain — 10 minutes counts as done. Moving is enough.' },
       { label:'Option B · BB 20–35 · default', name:'Zone 2 Treadmill', color:'var(--cardio)', recommended:true,
         items:['30–35 min treadmill · conversational pace','~65% max HR · 1–2% incline','Z2: 112–129 bpm · no lifting'],
         note:'No lifting on Day 2 regardless — absolute rule. Respects interrupted shift sleep.' },
@@ -2405,6 +2406,9 @@ const WORKOUT_DETAIL = [
         items:['5 × 3 min moderate effort · ~70%','2 min easy row rest between sets','~25 min total · no lifting'],
         note:'Only when genuinely recovered. Still no lifting on Day 2.' },
     ],
+    // NOTE: this static block is a fallback only — applyCycleVariants() overwrites
+    // WORKOUT_DETAIL[1].options with DAY2_DECKS[deck].options on every init() before
+    // any render happens. Kept in sync manually; DAY2_DECKS is the source of truth.
   },
   // ── Day 3 · Recovery Swim ───────────────────────────────
   {
@@ -2471,8 +2475,8 @@ const WORKOUT_DETAIL = [
         ]},
       ],
     },
-    modeNote:{full:'Key day — protect this session above all others', modified:'Skip EMOM — complete lifts and accessories, get out clean'},
-    note:'🔒 Most protected session. Progression: +5 lbs deadlift and floor press when all 5×5 clean. Add 7th EMOM round when splits stay within 5 sec.',
+    modeNote:{full:'Day 4–5 window — Day 5 is a fully valid default, not a miss', modified:'Skip EMOM — complete lifts and accessories, get out clean'},
+    note:'Land this Day 4 or Day 5 — both count equally, no penalty for shifting; Block 1 showed Day 5 as the more common (and equally effective) landing spot. Progression: +5 lbs deadlift when all 5×5 clean. Floor press progresses on reps, not load — see Working Weights below; raise the weight yourself whenever the shoulder allows it. Add 7th EMOM round when splits stay within 5 sec.',
     liftKey:'liftB',
     skipUnder35:true,
   },
@@ -2486,7 +2490,7 @@ const WORKOUT_DETAIL = [
       { label:'Option C · freestyle build', name:'Mixed Stroke', color:'var(--swim)',
         items:['Odd 100s: breaststroke','Even 100s: freestyle','8 × 100 total · 800 yds','Use as freestyle builds'] },
     ],
-    note:'SWOLF baseline: 47–52. Target: 45–47. Can push harder than Day 3 — full recovery behind you.',
+    note:'SWOLF target met (44 on 7/15, block best) — swim is in maintenance now, not a growth lever. Hold 45–47 and enjoy it. Can push harder than Day 3 — full recovery behind you.',
   },
   // ── Day 6 · Mobility ────────────────────────────────────
   {
@@ -2541,7 +2545,7 @@ const LIFTB_ACC = {
 const DAY2_DECKS = {
   A: { // treadmill (odd cycles)
     rules: [
-      {max:19, opt:'Option A',   desc:'10 min mobility + 20 min easy treadmill ~60% max HR (Z1: 93–111 bpm). No lifting.'},
+      {max:19, opt:'Option A',   desc:'10 min mobility + 10 min easy treadmill ~60% max HR (Z1: 93–111 bpm). No lifting.'},
       {max:34, opt:'Option B ✓', desc:'30–35 min treadmill conversational ~65% max HR, 1–2% incline (Z2: 112–129 bpm).'},
       {max:999,opt:'Option C',   desc:'Rower intervals — 5×3 min ~70%, 2 min rest, ~25 min total. No lifting — absolute Day 2 rule.'},
     ],
@@ -2559,14 +2563,14 @@ const DAY2_DECKS = {
   },
   B: { // rower-led (even cycles) — station has treadmill + rower only
     rules: [
-      {max:19, opt:'Option A',   desc:'10 min mobility + 15 min easy row. Z1 · no lifting.'},
+      {max:19, opt:'Option A',   desc:'10 min mobility + 10 min easy row. Z1 · no lifting.'},
       {max:34, opt:'Option B ✓', desc:'25–30 min steady Z2 row (~22 strokes/min), conversational. No lifting.'},
       {max:999,opt:'Option C',   desc:'Row intervals — 6×2 min moderate, 90 sec easy between, ~20 min. No lifting — absolute Day 2 rule.'},
     ],
     options: [
       { label:'Option A · BB under 20', name:'Mobility + Easy Row', color:'var(--cardio)',
-        items:['10 min mobility — hip flexors, thoracic, calves','15 min easy row — Z1, relaxed','No lifting'],
-        note:'Post-shift drain. Moving is enough — rower is kind to tired legs.' },
+        items:['10 min mobility — hip flexors, thoracic, calves','10 min easy row — Z1, relaxed','No lifting'],
+        note:'Post-shift drain — 10 minutes counts as done. Rower is kind to tired legs.' },
       { label:'Option B · BB 20–35 · default', name:'Steady Z2 Row', color:'var(--cardio)', recommended:true,
         items:['25–30 min steady row','~22 strokes/min · conversational','Z2 · no lifting'],
         note:'No lifting on Day 2 regardless — absolute rule. Respects interrupted shift sleep.' },
@@ -2608,7 +2612,7 @@ const LIFT_DEFS = {
   ],
   liftB:[
     {name:'Deadlift', key:'deadlift', default:155, adv:'+5 lbs when all 5×5 clean'},
-    {name:'Fl.Press', key:'flpress',  default:60,  adv:'+5 lbs when all 5×5 clean'},
+    {name:'Fl.Press', key:'flpress',  default:60,  adv:'Reps first — weight only when you choose to raise it', repTarget:true, repDefault:5},
     {name:'Lat Pull', key:'latpull',  default:100, adv:'+5 lbs when all 5×5 clean'},
   ],
 };
@@ -2616,7 +2620,11 @@ const LIFT_DEFS = {
 let activeLiftSession = null;
 
 function liftKey(session, date) { return `lift_${session}_${date}`; }
-function saveLift(session, date, weights) { S.setJSON(liftKey(session,date), {date,session,weights,at:new Date().toISOString()}); }
+function saveLift(session, date, weights, reps) {
+  const entry = {date, session, weights, at:new Date().toISOString()};
+  if(reps) entry.reps = reps;
+  S.setJSON(liftKey(session,date), entry);
+}
 function loadLift(session, date) { return S.getJSON(liftKey(session,date)); }
 function recentLifts(session, max=8) {
   const out=[];
@@ -2661,21 +2669,36 @@ function renderLiftLogger(liftKey) {
   const todayL = loadLift(liftKey, today);
 
   const gridHtml = defs.map(d => {
-    const lastVal  = last?.weights?.[d.key];
-    const todayVal = todayL?.weights?.[d.key];
-    // Target = last logged + 5, unless today already logged (show actual)
+    const lastVal   = last?.weights?.[d.key];
+    const todayVal  = todayL?.weights?.[d.key];
+    const lastReps  = last?.reps?.[d.key];
+    const todayReps = todayL?.reps?.[d.key];
+    // Target = last logged + 5, unless today already logged (show actual).
+    // repTarget lifts (floor press) HOLD weight instead — progression is via reps,
+    // weight stays a free-typed field so it can go up any time the shoulder allows.
     let target = d.default;
-    if(lastVal  !== undefined) target = Math.round((lastVal + 5) * 10) / 10;
+    if(lastVal  !== undefined) target = d.repTarget ? lastVal : Math.round((lastVal + 5) * 10) / 10;
     if(todayVal !== undefined) target = todayVal; // today's actual overrides
     const showLast = lastVal !== undefined && todayVal === undefined;
+
+    let repsTarget = d.repDefault || 5;
+    if(lastReps  !== undefined) repsTarget = lastReps;
+    if(todayReps !== undefined) repsTarget = todayReps;
+    const repsInput = d.repTarget ? `
+      <input type="number" class="lift-input" id="li_${d.key}_reps"
+        value="${repsTarget}" step="1" min="1" max="20" inputmode="numeric"
+        style="margin-top:6px">
+      <div class="lift-unit">reps / set</div>` : '';
+
     return `<div class="lift-cell">
       <div class="lift-cell-name">${d.name}</div>
       <input type="number" class="lift-input" id="li_${d.key}"
         value="${target}" step="2.5" min="0" inputmode="decimal"
         oninput="updatePlateHelper('${d.key}')">
-      <div class="lift-unit">${todayVal !== undefined ? 'lbs · logged' : 'lbs · target'}</div>
+      <div class="lift-unit">${todayVal !== undefined ? 'lbs · logged' : (d.repTarget ? 'lbs · hold, raise any time' : 'lbs · target')}</div>
       <div class="lift-plate" id="li_${d.key}_plate" style="font-size:11px;font-weight:600;color:var(--lift);margin-top:2px">${plateLoadLabel(target)}</div>
-      ${showLast ? `<div class="lift-adv" style="color:var(--text3)">Last: ${lastVal} lbs</div>` : ''}
+      ${repsInput}
+      ${showLast ? `<div class="lift-adv" style="color:var(--text3)">Last: ${lastVal} lbs${lastReps !== undefined ? ' × '+lastReps+' reps' : ''}</div>` : ''}
       ${d.adv && !showLast ? `<div class="lift-adv">${d.adv}</div>` : ''}
     </div>`;
   }).join('');
@@ -2710,9 +2733,22 @@ function renderLiftProg(session, logs) {
         ? `<strong style="color:var(--text)">${v}</strong>`
         : `<span style="color:var(--text3)">${v}</span>`
     ).join('<span style="color:var(--border2)"> › </span>');
+    let repsRow = '';
+    if(d.repTarget) {
+      const repVals = [...logs].reverse().map(l=>l.reps?.[d.key]).filter(v=>v!==undefined);
+      if(repVals.length >= 2) {
+        const repChain = repVals.map((v,i) =>
+          i===repVals.length-1
+            ? `<strong style="color:var(--text)">${v}</strong>`
+            : `<span style="color:var(--text3)">${v}</span>`
+        ).join('<span style="color:var(--border2)"> › </span>');
+        repsRow = `<div class="prog-chain" style="margin-top:2px">${repChain} reps/set</div>`;
+      }
+    }
     return `<div class="prog-row">
       <div class="prog-name">${d.name}</div>
       <div class="prog-chain">${chain} lbs &nbsp; ${deltaHtml}</div>
+      ${repsRow}
     </div>`;
   }).filter(Boolean).join('');
   return rows;
@@ -2722,11 +2758,16 @@ function saveTodayLifts() {
   if(!activeLiftSession) return;
   const defs = LIFT_DEFS[activeLiftSession];
   const weights = {};
+  const reps = {};
   defs.forEach(d => {
     const el = document.getElementById(`li_${d.key}`);
     if(el) weights[d.key] = parseFloat(el.value) || d.default;
+    if(d.repTarget) {
+      const rEl = document.getElementById(`li_${d.key}_reps`);
+      if(rEl) reps[d.key] = parseInt(rEl.value, 10) || d.repDefault || 5;
+    }
   });
-  saveLift(activeLiftSession, todayISO(), weights);
+  saveLift(activeLiftSession, todayISO(), weights, Object.keys(reps).length ? reps : undefined);
   const btn = document.querySelector('[onclick="saveTodayLifts()"]');
   if(btn) btn.textContent = '✓ Update Today\'s Weights';
   const conf = document.getElementById('lift-save-confirm');
@@ -4112,9 +4153,14 @@ function buildAIContext(data) {
       return defs.map(d => `${d.name} ${d.default} (no log yet — starting estimate)`).join(' / ');
     }
     const lastW = last.weights || {};
+    const lastR = last.reps    || {};
     return defs.map(d => {
       const lastVal = lastW[d.key];
       if(lastVal === undefined) return `${d.name} (no log)`;
+      if(d.repTarget) {
+        const r = lastR[d.key];
+        return `${d.name} last logged ${lastVal} lbs${r!==undefined?' × '+r+' reps':''} → HOLD weight, progress via reps only (he raises the weight himself when ready — do NOT suggest a weight increase)`;
+      }
       const next = Math.round((lastVal + 5) * 10) / 10;
       return `${d.name} last logged ${lastVal} → suggest ${next}`;
     }).join('; ') + ` (last logged ${last.date})`;
@@ -4199,7 +4245,7 @@ function buildAIContext(data) {
 
   // ── Standing medical context ───────────────────────────────
   const med = getMedical();
-  const medicalStr = `Sleep study: ${med.sleep_study_status}. BP: ${med.bp_monitoring}. GLP-1: ${med.glp1_dose}. Protein target: ${med.protein_target || '180–200g/day'}. Nicotine: ${med.nicotine_stage}.`;
+  const medicalStr = `Sleep study: ${med.sleep_study_status}. BP: ${med.bp_monitoring}. GLP-1: ${med.glp1_dose}. Protein target: ${med.protein_target || '180–200g/day'}. Nicotine: ${med.nicotine_stage}. Bedtime target: ${med.bedtime_target || '22:45–23:00'}.`;
 
   return {
     profile: `Nicholas — 39yo firefighter, Pearland TX, 48/96 shift. Recomping — scale weight is not a reliable signal right now; slow upward drift reflects muscle gain, not fat gain, and should never be framed as a setback. Sleep deficit IMPROVING — ~1.6h now vs ~2.5h a year ago (bedtime ~1h earlier, sleep grew from 5h46m to 6h43m/night). Frame sleep as a positive trajectory, not a static chronic deficit. HRV baseline 33–37ms (37ms+ is a strong night, 30ms is now BELOW average, flag under 29). Resting HR 53–55. VO₂ max 36 — target 38 by end of block; running is the ONLY lever that moves VO₂ (swim/lift don't), so 1 run per cycle (min 20 min, GPS) is the active prescription. Running now in rotation (first runs Jun 8 & Jun 22) — not yet a programmed day; track separately from swim SWOLF. BB ceiling ~65–87 on best nights and capped by an unresolved sleep-breathing issue (SpO₂ to 79% floor, sleep study referral pending) — NOT a training problem; never frame the BB cap as overtraining. No overhead pressing — floor press is the permanent substitute. Wife also firefighter on 48/96 starting day after Nicholas — always on shift Nicholas's Cycle Day 3, home from Day 4 morning. Solo parenting Cycle Day 3. Kids in daycare M/W/F 0830–1445. Backup support occasionally available.`,
@@ -5060,7 +5106,7 @@ function dismissExportNudge() {
 }
 
 // Start
-const BUILD = 'v18 · ' + new Date().toISOString().slice(11,16);
+const BUILD = 'v19 · ' + new Date().toISOString().slice(11,16);
 try { document.getElementById('build-tag').textContent = 'build ' + BUILD; } catch(e){}
 
 checkFirstRun();
@@ -5078,8 +5124,8 @@ if(getAnthropicKey() && getSheetsKey()) {
 let _waitingSW = null;
 
 // NOTE: REPLACE this each deploy — do not prepend. The modal shows only the current update.
-const UPDATE_VERSION = 'v2.0 · Block 2';
-const UPDATE_NOTES   = `Block 2 begins. VO₂ target 37.5–38.5 (long-term 42+). Accessories now alternate every cycle — Deck A on odd cycles, Deck B on even — to stay fresh; main 5×5 unchanged. Day 2 recovery alternates treadmill/rower deck. New glute-med + foam-roll work for the knee, controlled shoulder work on Lift B. New 🏃 run-owed badge tracks your 1 floating run per cycle and nudges you if it's still owed late in the cycle.`;
+const UPDATE_VERSION = 'v2.1 · Block 1 Review';
+const UPDATE_NOTES   = `Block 1 review adjustments. Floor press now progresses on REPS, not load — weight stays open to raise any time (new reps field in Working Weights). Lift B reframed as a Day 4–5 window, Day 5 fully valid — no more "missed the key day" guilt. Day 2 floor lowered to 10 min on the lowest tier. Swim goal marked met/maintenance (SWOLF 44 hit). Bedtime target (22:45–23:00) added to the coach's context — Block 1 sleep got shorter even as quality improved.`;
 
 function showUpdateModal(worker) {
   _waitingSW = worker;
