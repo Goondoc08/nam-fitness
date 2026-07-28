@@ -719,6 +719,7 @@ input:checked ~ .toggle-slider-orange::before{background:var(--orange);transform
     <div class="badge badge-gray" id="week-badge">Cycle — of 12</div>
     <div class="badge badge-gray" id="shift-badge">—</div>
     <div class="badge badge-gray" id="run-badge" style="display:none;cursor:pointer" onclick="showPage('session')">—</div>
+    <span id="run-badge-clear" onclick="event.stopPropagation();clearRunFlagsThisCycle()" style="display:none;font-size:11px;color:var(--text3);text-decoration:underline;cursor:pointer;align-self:center">not right?</span>
   </div>
   <div id="off-work-strip" style="margin-bottom:12px"></div>
 
@@ -1881,9 +1882,16 @@ function renderStaticUI() {
 //  as nam_run_done_<date>) OR a VO₂ Max on-demand session was logged. Escalates
 //  Cycle Day 4–5, auto-resets at Cycle Day 1.
 // ══════════════════════════════════════════════════════════
-const RUN_ACT_RE = /\brun|jog/i;
+const RUN_ACT_RE = /\b(?:run|jog)/i;
 function isRunActivity(a) {
-  return RUN_ACT_RE.test(a?.activity_name || '') || RUN_ACT_RE.test(a?.raw_type || '');
+  // Day 2 Recovery Cardio treadmill sessions sync from Garmin as e.g. "Treadmill
+  // Running" (typeKey treadmill_running) even at a walk pace — that's routine
+  // cardio, NOT the dedicated outdoor floating run this badge tracks. Exclude
+  // anything treadmill-flavored regardless of which field carries the name.
+  const name = a?.activity_name || '';
+  const type = a?.raw_type || '';
+  if(/treadmill/i.test(name) || /treadmill/i.test(type)) return false;
+  return RUN_ACT_RE.test(name) || RUN_ACT_RE.test(type);
 }
 function markRunFromActivities(activities) {
   if(Array.isArray(activities) && activities.some(isRunActivity)) {
@@ -1913,6 +1921,21 @@ function renderRunBadge() {
   el.className = 'badge ' + cls;
   el.textContent = txt;
   el.style.display = '';
+
+  const clearEl = document.getElementById('run-badge-clear');
+  if(clearEl) clearEl.style.display = runDoneThisCycle() ? '' : 'none';
+}
+
+// Manual correction for a false-positive auto-detect (e.g. a treadmill session
+// that synced from Garmin with "running" in its name/type before the exclusion
+// above existed). Only clears the auto-detected nam_run_done_* flags for dates
+// within THIS cycle — never touches a deliberate on-demand VO₂ log, since that's
+// an explicit user action and should stand.
+function clearRunFlagsThisCycle() {
+  const idx = getCycleIdx();
+  for(let i = 0; i <= idx; i++) S.del('run_done_' + offsetISO(-i));
+  renderRunBadge();
+  showToast('Run flag cleared for this cycle');
 }
 
 // ══════════════════════════════════════════════════════════
@@ -5106,7 +5129,7 @@ function dismissExportNudge() {
 }
 
 // Start
-const BUILD = 'v19 · ' + new Date().toISOString().slice(11,16);
+const BUILD = 'v20 · ' + new Date().toISOString().slice(11,16);
 try { document.getElementById('build-tag').textContent = 'build ' + BUILD; } catch(e){}
 
 checkFirstRun();
@@ -5124,8 +5147,8 @@ if(getAnthropicKey() && getSheetsKey()) {
 let _waitingSW = null;
 
 // NOTE: REPLACE this each deploy — do not prepend. The modal shows only the current update.
-const UPDATE_VERSION = 'v2.1 · Block 1 Review';
-const UPDATE_NOTES   = `Block 1 review adjustments. Floor press now progresses on REPS, not load — weight stays open to raise any time (new reps field in Working Weights). Lift B reframed as a Day 4–5 window, Day 5 fully valid — no more "missed the key day" guilt. Day 2 floor lowered to 10 min on the lowest tier. Swim goal marked met/maintenance (SWOLF 44 hit). Bedtime target (22:45–23:00) added to the coach's context — Block 1 sleep got shorter even as quality improved.`;
+const UPDATE_VERSION = 'v2.2 · Run Badge Fix';
+const UPDATE_NOTES   = `Fixed the 🏃 run-owed badge: a Day 2 treadmill session syncing from Garmin as "Treadmill Running" was incorrectly marking the cycle's floating run as done. Treadmill activities no longer count. If the badge is currently stuck on "done" from this bug, a "not right?" link now appears next to it — tap it to clear this cycle's flag.`;
 
 function showUpdateModal(worker) {
   _waitingSW = worker;
