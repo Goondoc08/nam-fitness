@@ -4119,6 +4119,18 @@ function buildAIContext(data) {
     return `${logged} of ${daysDone + 1} days with session logged since tracking started`;
   }
 
+  // ── This-cycle adherence (scoped to the current 6-day cycle only, NOT the
+  // cumulative block count above — the "this_week" coaching field asks about
+  // "the current 6-day cycle" specifically, so it needs its own number) ──
+  function getCycleAdherence() {
+    const idx = getCycleIdx(); // 0..5 = how many days into this cycle, including today
+    let logged = 0;
+    for(let i = 0; i <= idx; i++) {
+      if(S.getJSON('session_log_' + offsetISO(-i))) logged++;
+    }
+    return `${logged} of ${idx + 1} days logged this cycle (today is Cycle Day ${idx + 1} of 6)`;
+  }
+
   // ── Activities from Activity Log tab ──────────────────────
   function getActsForDate(dateStr) {
     return acts.filter(a => a.date === dateStr);
@@ -4224,6 +4236,7 @@ function buildAIContext(data) {
   const bbFlagInfo  = getBBFlag();
   const weeklySummary = getWeeklySummary();
   const blockAdh    = getBlockAdherence();
+  const cycleAdh    = getCycleAdherence();
 
   // ── Flags ──────────────────────────────────────────────────
   const flags = computeFlags(snap, data.daily || []);
@@ -4273,7 +4286,7 @@ function buildAIContext(data) {
   return {
     profile: `Nicholas — 39yo firefighter, Pearland TX, 48/96 shift. Recomping — scale weight is not a reliable signal right now; slow upward drift reflects muscle gain, not fat gain, and should never be framed as a setback. Sleep deficit IMPROVING — ~1.6h now vs ~2.5h a year ago (bedtime ~1h earlier, sleep grew from 5h46m to 6h43m/night). Frame sleep as a positive trajectory, not a static chronic deficit. HRV baseline 33–37ms (37ms+ is a strong night, 30ms is now BELOW average, flag under 29). Resting HR 53–55. VO₂ max 36 — target 38 by end of block; running is the ONLY lever that moves VO₂ (swim/lift don't), so 1 run per cycle (min 20 min, GPS) is the active prescription. Running now in rotation (first runs Jun 8 & Jun 22) — not yet a programmed day; track separately from swim SWOLF. BB ceiling ~65–87 on best nights and capped by an unresolved sleep-breathing issue (SpO₂ to 79% floor, sleep study referral pending) — NOT a training problem; never frame the BB cap as overtraining. No overhead pressing — floor press is the permanent substitute. Wife also firefighter on 48/96 starting day after Nicholas — always on shift Nicholas's Cycle Day 3, home from Day 4 morning. Solo parenting Cycle Day 3. Kids in daycare M/W/F 0830–1445. Backup support occasionally available.`,
 
-    metrics: `Cycle ${weekNum} of 12. ${blockAdh}.
+    metrics: `Cycle ${weekNum} of 12. ${blockAdh}. THIS CYCLE'S ADHERENCE (use this exact figure for any "this week/cycle" comment — do not recompute or invent a different number): ${cycleAdh}.
 Cycle Day ${day.num} — ${day.name}. ${getShiftPosition(idx)}
 BB wake: ${bbWake ?? '—'}${noWakeFlag} | BB current: ${bbCurrent ?? '—'} | HRV: ${hrv ?? '—'}ms${hrvTrend ? ' ('+hrvTrend+')' : ''}${hrvBaseline ? ` | 30d HRV baseline: ${hrvBaseline}ms` : ''}
 BB flag: ${bbFlagInfo.flag ? `YES — ${bbFlagInfo.reason}` : 'No — normal range, do not call out'}
@@ -4381,7 +4394,7 @@ ${isMorn ? `Morning schema:
 }`}
 
 ${isMorn
-  ? `Morning rules: last_night leads with the quality split (score, hours, deep, REM) and what it means — not just the numbers. capacity gives a clear load verdict. today_session is exact — name the movement, load, and location; it is the PLAN for today, never state or imply it is already done. If off work drop all station/shift/call refs and use home/gym framing. this_week is one sharp adherence read of the current 6-day cycle. tomorrow previews the session type and the key metric threshold. spo2_note: SpO2 is a known chronic issue with a sleep study pending — mention it only if there is a specific action for today; never explain the problem at length.${isNoWake ? ' Wake BB unavailable — use readiness/HRV instead.' : ''}${isNoSlp ? ' Sleep data unavailable — do not cite sleep score or hours as fact.' : ''} BB: wake BB drives today's session tier — normal context, not a concern by default. Only frame it as a warning sign if BB flag in METRICS is YES.`
+  ? `Morning rules: last_night leads with the quality split (score, hours, deep, REM) and what it means — not just the numbers. capacity gives a clear load verdict. today_session is exact — name the movement, load, and location; it is the PLAN for today, never state or imply it is already done. If off work drop all station/shift/call refs and use home/gym framing. this_week is one sharp adherence read of the current 6-day cycle — you MUST use the exact "THIS CYCLE'S ADHERENCE" figure given in METRICS verbatim (e.g. if it says "3 of 4 days logged", say 3 of 4 — never round up, recompute, or state a different number, even if a rest day was intentional or explained in a session note). tomorrow previews the session type and the key metric threshold. spo2_note: SpO2 is a known chronic issue with a sleep study pending — mention it only if there is a specific action for today; never explain the problem at length.${isNoWake ? ' Wake BB unavailable — use readiness/HRV instead.' : ''}${isNoSlp ? ' Sleep data unavailable — do not cite sleep score or hours as fact.' : ''} BB: wake BB drives today's session tier — normal context, not a concern by default. Only frame it as a warning sign if BB flag in METRICS is YES.`
   : `Evening rules: headline states his condition right now. note flows as prose. CRITICAL — obey SESSION STATUS TODAY exactly: if COMPLETED, open by acknowledging the session he did today — say "today", never "this morning" or any other specific time of day, since the session may have been logged at any point in the day; if NOT LOGGED, you must NOT claim or imply he trained — say plainly the session isn't logged, then decide based on bb_current (his state right now): if bb_current is reasonable, give a brief "if you can still get it in tonight" nudge with the specific session; if bb_current is low enough that training would dig into reserves (roughly under 30), recommend shifting it to tomorrow instead. Never infer completion from the recommendation card. Then name the single biggest recovery lever for tonight, preview tomorrow's session and BB threshold, and close with one concrete bedtime action. If returning to shift tomorrow, call it out explicitly. spo2_note: only if actionable tonight, never a lengthy explanation. BB: use bb_current as his state right now — bb_wake was the morning starting point and drives workout tiers only. A same-day wake-to-current dip is normal after activity and should NOT be called out by default. Only mention a BB concern, and only then, if BB flag in METRICS is YES — use the given reason, don't invent your own.`}
 
 No motivational filler. No generic advice. Write like you have been coaching him for months.`;
@@ -5129,7 +5142,7 @@ function dismissExportNudge() {
 }
 
 // Start
-const BUILD = 'v20 · ' + new Date().toISOString().slice(11,16);
+const BUILD = 'v21 · ' + new Date().toISOString().slice(11,16);
 try { document.getElementById('build-tag').textContent = 'build ' + BUILD; } catch(e){}
 
 checkFirstRun();
@@ -5147,8 +5160,8 @@ if(getAnthropicKey() && getSheetsKey()) {
 let _waitingSW = null;
 
 // NOTE: REPLACE this each deploy — do not prepend. The modal shows only the current update.
-const UPDATE_VERSION = 'v2.2 · Run Badge Fix';
-const UPDATE_NOTES   = `Fixed the 🏃 run-owed badge: a Day 2 treadmill session syncing from Garmin as "Treadmill Running" was incorrectly marking the cycle's floating run as done. Treadmill activities no longer count. If the badge is currently stuck on "done" from this bug, a "not right?" link now appears next to it — tap it to clear this cycle's flag.`;
+const UPDATE_VERSION = 'v2.3 · Adherence Fix';
+const UPDATE_NOTES   = `Fixed the morning note's weekly adherence line — it was stating an invented number instead of your real logged count (e.g. claiming "6 of 6" with a genuine rest day in the mix). The coach note is now locked to a real cycle-scoped count and required to quote it exactly, no rounding up.`;
 
 function showUpdateModal(worker) {
   _waitingSW = worker;
