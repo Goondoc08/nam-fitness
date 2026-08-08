@@ -1321,6 +1321,17 @@ input:checked ~ .toggle-slider-orange::before{background:var(--orange);transform
         <div style="font-size:12px;color:var(--text2);line-height:1.55" id="nic-phase-note"></div>
       </div>
     </div>
+    <div style="margin-top:10px">
+      <span onclick="showNicStreakRestore()" style="font-size:11px;color:var(--text3);text-decoration:underline;cursor:pointer">Lost your streak to a data wipe? Restore it</span>
+      <div id="nic-streak-restore-panel" style="display:none;margin-top:10px;padding:10px 12px;background:var(--card2);border-radius:10px;border:1px solid var(--border)">
+        <div style="font-size:12px;color:var(--text2);margin-bottom:8px;font-weight:600">How many days were you actually on track through today?</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="number" id="nic-streak-restore-input" min="0" max="3650" placeholder="e.g. 61" style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:6px 10px;font-size:13px">
+          <button onclick="applyNicStreakRestore()" style="background:var(--green);color:#0D0F14;border:none;border-radius:8px;padding:6px 14px;font-size:13px;font-weight:700;cursor:pointer">Set</button>
+        </div>
+        <div style="font-size:11px;color:var(--text3);margin-top:6px">Keeps counting up normally from today — only use this once, right after a wipe.</div>
+      </div>
+    </div>
   </div>
 
   <!-- Date selector -->
@@ -5009,7 +5020,30 @@ function getNicStreak() {
     if((entry.lozenges||0) <= getNicGoal(dateStr)) streak++;
     else break;
   }
+  // Manual recovery override (e.g. after a browser data wipe erased the daily
+  // logs the real calc above depends on) — a one-time self-reported anchor that
+  // then grows automatically each day, same as the real calc would have.
+  const ov = S.getJSON('nic_streak_override');
+  if(ov) {
+    const daysSince = Math.round((todayMidnight() - new Date(ov.setOn+'T00:00:00')) / 86400000);
+    streak = Math.max(streak, ov.value + daysSince);
+  }
   return streak;
+}
+
+function showNicStreakRestore() {
+  const panel = document.getElementById('nic-streak-restore-panel');
+  if(panel) panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+}
+
+function applyNicStreakRestore() {
+  const input = document.getElementById('nic-streak-restore-input');
+  const val   = parseInt(input?.value, 10);
+  if(!val && val !== 0) { showToast('Enter a day count first'); return; }
+  S.setJSON('nic_streak_override', { value: val, setOn: todayISO() });
+  showNicStreakRestore();
+  renderNicStreak();
+  showToast(`Streak restored to ${val} ✓`);
 }
 
 function getNicPhaseLabel(dateStr) {
@@ -5142,7 +5176,7 @@ function dismissExportNudge() {
 }
 
 // Start
-const BUILD = 'v21 · ' + new Date().toISOString().slice(11,16);
+const BUILD = 'v22 · ' + new Date().toISOString().slice(11,16);
 try { document.getElementById('build-tag').textContent = 'build ' + BUILD; } catch(e){}
 
 checkFirstRun();
@@ -5160,8 +5194,8 @@ if(getAnthropicKey() && getSheetsKey()) {
 let _waitingSW = null;
 
 // NOTE: REPLACE this each deploy — do not prepend. The modal shows only the current update.
-const UPDATE_VERSION = 'v2.3 · Adherence Fix';
-const UPDATE_NOTES   = `Fixed the morning note's weekly adherence line — it was stating an invented number instead of your real logged count (e.g. claiming "6 of 6" with a genuine rest day in the mix). The coach note is now locked to a real cycle-scoped count and required to quote it exactly, no rounding up.`;
+const UPDATE_VERSION = 'v2.4 · Streak Recovery';
+const UPDATE_NOTES   = `Added a "Lost your streak to a data wipe? Restore it" link on the Nicotine page — a one-time manual reset for exactly this scenario (a browser data clear wiping localStorage, which every one of your PWAs stores everything in with no cloud sync). Set your real day count once and it keeps counting up normally from there.`;
 
 function showUpdateModal(worker) {
   _waitingSW = worker;
