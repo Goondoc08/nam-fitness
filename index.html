@@ -1275,6 +1275,9 @@ input:checked ~ .toggle-slider-orange::before{background:var(--orange);transform
       <div style="height:12px"></div>
       <button class="btn" onclick="exportData()" style="width:100%;font-size:13px;background:rgba(0,229,255,.12);color:var(--swim);border:1px solid rgba(0,229,255,.25)">📤 Export Data for Analysis</button>
       <div style="font-size:11px;color:var(--text3);margin-top:6px;margin-bottom:12px">Downloads a JSON file with all your logs — upload to Claude for deeper insights</div>
+      <input type="file" id="import-file-input" accept="application/json" style="display:none" onchange="handleImportFile(event)">
+      <button class="btn" onclick="document.getElementById('import-file-input').click()" style="width:100%;font-size:13px;background:rgba(0,229,255,.12);color:var(--swim);border:1px solid rgba(0,229,255,.25)">📥 Import Data from Export</button>
+      <div style="font-size:11px;color:var(--text3);margin-top:6px;margin-bottom:12px">Restore logs from a previously exported JSON file — for moving to a new domain or recovering from a data wipe</div>
       <button class="btn btn-outline btn-sm" onclick="clearAllData()" style="width:100%;font-size:12px;color:var(--lift);border-color:rgba(255,51,102,.3)">Clear all local data</button>
     </div>
   </div>
@@ -4982,6 +4985,47 @@ async function exportData() {
 }
 
 // ══════════════════════════════════════════════════════════
+//  IMPORT (reverses exportData's bucketing back into nam_ localStorage keys)
+// ══════════════════════════════════════════════════════════
+function handleImportFile(event) {
+  const file = event.target.files[0];
+  event.target.value = ''; // allow re-selecting the same file later
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    let data;
+    try { data = JSON.parse(reader.result); }
+    catch(e) { showToast('Not a valid export file'); return; }
+    const when = data.exportedAt ? new Date(data.exportedAt).toLocaleDateString() : 'an unknown date';
+    if(!confirm(`Import data exported on ${when}?\n\nThis overlays those logs on top of what's currently stored here — matching dates get overwritten, everything else is left alone.`)) return;
+    importData(data);
+  };
+  reader.readAsText(file);
+}
+
+function importData(data) {
+  const PREFIX_MAP = {
+    sessions: 'nam_session_log_', lifestyle: 'nam_log_', stretch: 'nam_stretch_log_',
+    on_demand: 'nam_on_demand_log_', nicotine: 'nam_nic_', blood_pressure: 'nam_bp_', lifts: 'nam_lift_'
+  };
+  let count = 0;
+  const restoreBucket = (obj, keyFor) => {
+    if(!obj || typeof obj !== 'object') return;
+    Object.keys(obj).forEach(k => {
+      const val = obj[k];
+      localStorage.setItem(keyFor(k), typeof val === 'string' ? val : JSON.stringify(val));
+      count++;
+    });
+  };
+  Object.keys(PREFIX_MAP).forEach(bucket => restoreBucket(data[bucket], k => PREFIX_MAP[bucket] + k));
+  // Settings + other were both flattened under 'nam_' + key on export
+  restoreBucket(data.settings, k => 'nam_' + k);
+  restoreBucket(data.other, k => 'nam_' + k);
+  showToast(`Imported ${count} record${count===1?'':'s'} ✓`);
+  setTimeout(() => location.reload(), 900);
+}
+
+// ══════════════════════════════════════════════════════════
 //  NICOTINE TRACKING
 // ══════════════════════════════════════════════════════════
 const NIC_START = '2026-06-05'; // streak counting begins here
@@ -5176,7 +5220,7 @@ function dismissExportNudge() {
 }
 
 // Start
-const BUILD = 'v22 · ' + new Date().toISOString().slice(11,16);
+const BUILD = 'v23 · ' + new Date().toISOString().slice(11,16);
 try { document.getElementById('build-tag').textContent = 'build ' + BUILD; } catch(e){}
 
 checkFirstRun();
@@ -5194,8 +5238,8 @@ if(getAnthropicKey() && getSheetsKey()) {
 let _waitingSW = null;
 
 // NOTE: REPLACE this each deploy — do not prepend. The modal shows only the current update.
-const UPDATE_VERSION = 'v2.4 · Streak Recovery';
-const UPDATE_NOTES   = `Added a "Lost your streak to a data wipe? Restore it" link on the Nicotine page — a one-time manual reset for exactly this scenario (a browser data clear wiping localStorage, which every one of your PWAs stores everything in with no cloud sync). Set your real day count once and it keeps counting up normally from there.`;
+const UPDATE_VERSION = 'v2.5 · Import Data';
+const UPDATE_NOTES   = `Added an "Import Data from Export" button next to Export (Settings page) — reads a previously exported JSON file back into local storage, matching dates overwritten, everything else left alone. Built for restoring history after a data wipe, and for the upcoming move off goondoc08.github.io to a custom domain (a domain change starts every app with empty storage, since it's a new origin — export before, import after). Also switched this app's install shortcut (manifest start_url/scope) to relative paths so it keeps working once that move happens.`;
 
 function showUpdateModal(worker) {
   _waitingSW = worker;
