@@ -4308,7 +4308,9 @@ Sleep: ${sleepHrs ?? '—'} hrs · score ${sleepScore ?? '—'}/100 · deep ${de
 Readiness: ${readiness} | Status: ${status} | VO₂: ${vo2} | Resting HR: ${restHR} | Stress: ${stress}
 ${weeklySummary}`,
 
-    sessionCtx: `Today's session recommendation: "${rule.opt}" — ${rule.desc}${sessionShiftNote ? '\n'+sessionShiftNote : ''}`,
+    sessionCtx: todaySessionLog
+      ? `SESSION (default cycle-day recommendation — MOOT, already superseded): "${rule.opt}" — ${rule.desc}. Ignore this for tonight/today — a session is already logged (see SESSION STATUS TODAY above); do not present this as still outstanding.`
+      : `Today's session recommendation: "${rule.opt}" — ${rule.desc}${sessionShiftNote ? '\n'+sessionShiftNote : ''}`,
 
     tomorrow: `TOMORROW: Cycle Day ${tomorrow.num} — ${tomorrow.name}. ${getTomorrowShiftNote(tomorrowIdx)}
 Recommendation: "${tomorrowRule.opt}" — ${tomorrowRule.desc}`,
@@ -4408,8 +4410,8 @@ ${isMorn ? `Morning schema:
 }`}
 
 ${isMorn
-  ? `Morning rules: last_night leads with the quality split (score, hours, deep, REM) and what it means — not just the numbers. capacity gives a clear load verdict. today_session is exact — name the movement, load, and location; it is the PLAN for today, never state or imply it is already done. If off work drop all station/shift/call refs and use home/gym framing. this_week is one sharp adherence read of the current 6-day cycle — you MUST use the exact "THIS CYCLE'S ADHERENCE" figure given in METRICS verbatim (e.g. if it says "3 of 4 days logged", say 3 of 4 — never round up, recompute, or state a different number, even if a rest day was intentional or explained in a session note). tomorrow previews the session type and the key metric threshold. spo2_note: SpO2 is a known chronic issue with a sleep study pending — mention it only if there is a specific action for today; never explain the problem at length.${isNoWake ? ' Wake BB unavailable — use readiness/HRV instead.' : ''}${isNoSlp ? ' Sleep data unavailable — do not cite sleep score or hours as fact.' : ''} BB: wake BB drives today's session tier — normal context, not a concern by default. Only frame it as a warning sign if BB flag in METRICS is YES.`
-  : `Evening rules: headline states his condition right now. note flows as prose. CRITICAL — obey SESSION STATUS TODAY exactly: if COMPLETED, open by acknowledging the session he did today — say "today", never "this morning" or any other specific time of day, since the session may have been logged at any point in the day; if NOT LOGGED, you must NOT claim or imply he trained — say plainly the session isn't logged, then decide based on bb_current (his state right now): if bb_current is reasonable, give a brief "if you can still get it in tonight" nudge with the specific session; if bb_current is low enough that training would dig into reserves (roughly under 30), recommend shifting it to tomorrow instead. Never infer completion from the recommendation card. Then name the single biggest recovery lever for tonight, preview tomorrow's session and BB threshold, and close with one concrete bedtime action. If returning to shift tomorrow, call it out explicitly. spo2_note: only if actionable tonight, never a lengthy explanation. BB: use bb_current as his state right now — bb_wake was the morning starting point and drives workout tiers only. A same-day wake-to-current dip is normal after activity and should NOT be called out by default. Only mention a BB concern, and only then, if BB flag in METRICS is YES — use the given reason, don't invent your own.`}
+  ? `Morning rules: last_night leads with the quality split (score, hours, deep, REM) and what it means — not just the numbers. capacity gives a clear load verdict. today_session is exact — name the movement, load, and location; it is the PLAN for today, never state or imply it is already done. CHECK SESSION NOTES FIRST: if a recent note (especially one from yesterday) explicitly states a plan for today — e.g. "doing Lift B tomorrow" logged the day before — that stated plan governs today_session; only fall back to the default cycle-day recommendation in SESSION below if no note addresses today. If off work drop all station/shift/call refs and use home/gym framing. this_week is one sharp adherence read of the current 6-day cycle — you MUST use the exact "THIS CYCLE'S ADHERENCE" figure given in METRICS verbatim (e.g. if it says "3 of 4 days logged", say 3 of 4 — never round up, recompute, or state a different number, even if a rest day was intentional or explained in a session note). tomorrow previews the session type and the key metric threshold — check SESSION NOTES for an explicit stated plan for tomorrow first and use it over the default TOMORROW block if present. spo2_note: SpO2 is a known chronic issue with a sleep study pending — mention it only if there is a specific action for today; never explain the problem at length.${isNoWake ? ' Wake BB unavailable — use readiness/HRV instead.' : ''}${isNoSlp ? ' Sleep data unavailable — do not cite sleep score or hours as fact.' : ''} BB: wake BB drives today's session tier — normal context, not a concern by default. Only frame it as a warning sign if BB flag in METRICS is YES.`
+  : `Evening rules: headline states his condition right now. note flows as prose. CRITICAL — obey SESSION STATUS TODAY exactly: if COMPLETED, open by acknowledging the session he did today — say "today", never "this morning" or any other specific time of day, since the session may have been logged at any point in the day. A completed day is DONE, full stop — this applies identically whether it was the day's default/nominal session or a shifted one. Do NOT suggest, reference, or imply there's still time tonight for the SESSION field's default recommendation below, or for any additional training — the SESSION field describes what the cycle nominally called for, not an outstanding task; once something is logged, it is moot and must not be mentioned as pending. If NOT LOGGED, you must NOT claim or imply he trained — say plainly the session isn't logged, then decide based on bb_current (his state right now): if bb_current is reasonable, give a brief "if you can still get it in tonight" nudge with the specific session; if bb_current is low enough that training would dig into reserves (roughly under 30), recommend shifting it to tomorrow instead. Never infer completion from the recommendation card. Then name the single biggest recovery lever for tonight, preview tomorrow's session and BB threshold — CHECK SESSION NOTES FIRST for an explicit plan he stated for tomorrow (e.g. deciding today to shift a lift to tomorrow); if one exists, preview THAT as tomorrow's plan instead of the default TOMORROW block given below — and close with one concrete bedtime action. If returning to shift tomorrow, call it out explicitly. spo2_note: only if actionable tonight, never a lengthy explanation. BB: use bb_current as his state right now — bb_wake was the morning starting point and drives workout tiers only. A same-day wake-to-current dip is normal after activity and should NOT be called out by default. Only mention a BB concern, and only then, if BB flag in METRICS is YES — use the given reason, don't invent your own.`}
 
 No motivational filler. No generic advice. Write like you have been coaching him for months.`;
 
@@ -4421,7 +4423,8 @@ FLAGS: ${ctx.flags}
 
 ⚑ SESSION STATUS TODAY: ${ctx.sessionStatus}
 
-=== SESSION NOTES (can override the schedule below) ===
+=== SESSION NOTES — CHECK THESE FIRST ===
+Each note is date-stamped. If any note explicitly states a plan for TODAY or TOMORROW (e.g. "doing Lift B tomorrow instead", "shifting to tomorrow"), that stated plan OVERRIDES the default SESSION/TOMORROW blocks below for that specific day — state HIS plan, not the default, and do not present both as if they're both still live options. A note only governs the day(s) it actually names; don't apply it further than that.
 ${ctx.sessionNotes}
 ===
 
@@ -5221,7 +5224,7 @@ function dismissExportNudge() {
 }
 
 // Start
-const BUILD = 'v24 · ' + new Date().toISOString().slice(11,16);
+const BUILD = 'v25 · ' + new Date().toISOString().slice(11,16);
 try { document.getElementById('build-tag').textContent = 'build ' + BUILD; } catch(e){}
 
 checkFirstRun();
@@ -5239,8 +5242,8 @@ if(getAnthropicKey() && getSheetsKey()) {
 let _waitingSW = null;
 
 // NOTE: REPLACE this each deploy — do not prepend. The modal shows only the current update.
-const UPDATE_VERSION = 'v2.6 · Streak Fix';
-const UPDATE_NOTES   = `Fixed the nicotine streak restore — it was auto-advancing by one every day whether or not you actually logged anything, instead of only counting real logged compliant days like it always did. The restored number now only grows when you log, and still breaks on a real miss, exactly like before the restore.`;
+const UPDATE_VERSION = 'v2.7 · Shift Awareness';
+const UPDATE_NOTES   = `Coach note fix: on a day you log a shifted session, the evening note no longer nags you about the original day's session as if there's still time tonight — a logged session is done, shifted or not. Also, when you note a plan like "doing Lift B tomorrow" in Session Notes, that plan now actually gets used for tomorrow's preview instead of the default cycle schedule.`;
 
 function showUpdateModal(worker) {
   _waitingSW = worker;
