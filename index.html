@@ -5055,22 +5055,23 @@ function getNicBadgeClass(lozenges, goal) {
 function getNicStreak() {
   // If today not yet logged, don't penalise — start from yesterday
   const hasTodayLog = !!S.getJSON('nic_' + todayISO());
+  // Manual recovery override (e.g. after a browser data wipe erased the daily
+  // logs this calc depends on) — a one-time self-reported base for everything
+  // ON OR BEFORE the day it was set. Days AFTER that still require a real
+  // logged, compliant entry each day, exactly like normal — the override is a
+  // floor for old history, never a substitute for actually logging going
+  // forward. It does NOT auto-advance on its own; skipping a day still breaks
+  // the streak same as always.
+  const ov = S.getJSON('nic_streak_override');
   let streak = 0;
   for(let i = hasTodayLog ? 0 : 1; i < 400; i++) {
     const dateStr = offsetISO(-i);
+    if(ov && dateStr <= ov.setOn) { streak += ov.value; return streak; }
     if(dateStr < NIC_START) break;
     const entry = S.getJSON('nic_' + dateStr);
     if(!entry) break;
     if((entry.lozenges||0) <= getNicGoal(dateStr)) streak++;
     else break;
-  }
-  // Manual recovery override (e.g. after a browser data wipe erased the daily
-  // logs the real calc above depends on) — a one-time self-reported anchor that
-  // then grows automatically each day, same as the real calc would have.
-  const ov = S.getJSON('nic_streak_override');
-  if(ov) {
-    const daysSince = Math.round((todayMidnight() - new Date(ov.setOn+'T00:00:00')) / 86400000);
-    streak = Math.max(streak, ov.value + daysSince);
   }
   return streak;
 }
@@ -5220,7 +5221,7 @@ function dismissExportNudge() {
 }
 
 // Start
-const BUILD = 'v23 · ' + new Date().toISOString().slice(11,16);
+const BUILD = 'v24 · ' + new Date().toISOString().slice(11,16);
 try { document.getElementById('build-tag').textContent = 'build ' + BUILD; } catch(e){}
 
 checkFirstRun();
@@ -5238,8 +5239,8 @@ if(getAnthropicKey() && getSheetsKey()) {
 let _waitingSW = null;
 
 // NOTE: REPLACE this each deploy — do not prepend. The modal shows only the current update.
-const UPDATE_VERSION = 'v2.5 · Import Data';
-const UPDATE_NOTES   = `Added an "Import Data from Export" button next to Export (Settings page) — reads a previously exported JSON file back into local storage, matching dates overwritten, everything else left alone. Built for restoring history after a data wipe, and for the upcoming move off goondoc08.github.io to a custom domain (a domain change starts every app with empty storage, since it's a new origin — export before, import after). Also switched this app's install shortcut (manifest start_url/scope) to relative paths so it keeps working once that move happens.`;
+const UPDATE_VERSION = 'v2.6 · Streak Fix';
+const UPDATE_NOTES   = `Fixed the nicotine streak restore — it was auto-advancing by one every day whether or not you actually logged anything, instead of only counting real logged compliant days like it always did. The restored number now only grows when you log, and still breaks on a real miss, exactly like before the restore.`;
 
 function showUpdateModal(worker) {
   _waitingSW = worker;
