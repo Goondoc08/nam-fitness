@@ -3951,8 +3951,6 @@ function buildAIContext(data) {
   const bb   = wakeBB ?? currentBB; // wake BB drives all training recommendations
   const weekNum      = getWeekNum();
   const tomorrowIdx  = (idx + 1) % 6;
-  const tomorrow     = DAYS[tomorrowIdx];
-  const tomorrowRule = getBBRule(tomorrowIdx, bb);
 
   // ── Shift position from cycle day ──────────────────────────
   function getShiftPosition(cycleIdx) {
@@ -4025,6 +4023,23 @@ function buildAIContext(data) {
     const doneDay      = DAYS[todaySessionLog.dayIdx];
     sessionShiftNote   = `NOTE: Nicholas deliberately moved ${doneDay.name} (Day ${doneDay.num}) to today instead of scheduled ${scheduledDay.name} (Day ${scheduledDay.num}) — intentional 48/96 scheduling, not an error.`;
   }
+
+  // ── Tomorrow's session — adjust for a same-day shift that already covers it ──
+  // The cycle clock (idx) is purely calendar-driven and never reshuffles itself
+  // just because a session was done out of order. If today's logged session was
+  // shifted and its type is the one the cycle would nominally schedule for
+  // tomorrow, that slot is already fulfilled a day early — recommend the NEXT
+  // type instead of repeating a session he already did (this is about WHICH
+  // WORKOUT to recommend only; the physical shift-schedule wording below still
+  // uses the real calendar tomorrowIdx, since that's unaffected by the shift).
+  let tomorrowSessionIdx     = tomorrowIdx;
+  let tomorrowShiftAheadNote = '';
+  if(todaySessionLog?.shifted && todaySessionLog.dayIdx === tomorrowIdx) {
+    tomorrowSessionIdx     = (tomorrowIdx + 1) % 6;
+    tomorrowShiftAheadNote = `NOTE: Nicholas already completed ${DAYS[tomorrowIdx].name} (Day ${DAYS[tomorrowIdx].num}) today, a day early. Tomorrow's nominal cycle slot is already fulfilled — do NOT recommend ${DAYS[tomorrowIdx].name} again for tomorrow. The actual next session is ${DAYS[tomorrowSessionIdx].name} (Day ${DAYS[tomorrowSessionIdx].num}).`;
+  }
+  const tomorrowSession     = DAYS[tomorrowSessionIdx];
+  const tomorrowSessionRule = getBBRule(tomorrowSessionIdx, bb);
 
   // ── Metrics — snapshot only ────────────────────────────────
   const bbWake    = parseFloat(snap.bb_wake)    || null;
@@ -4312,8 +4327,8 @@ ${weeklySummary}`,
       ? `SESSION (default cycle-day recommendation — MOOT, already superseded): "${rule.opt}" — ${rule.desc}. Ignore this for tonight/today — a session is already logged (see SESSION STATUS TODAY above); do not present this as still outstanding.`
       : `Today's session recommendation: "${rule.opt}" — ${rule.desc}${sessionShiftNote ? '\n'+sessionShiftNote : ''}`,
 
-    tomorrow: `TOMORROW: Cycle Day ${tomorrow.num} — ${tomorrow.name}. ${getTomorrowShiftNote(tomorrowIdx)}
-Recommendation: "${tomorrowRule.opt}" — ${tomorrowRule.desc}`,
+    tomorrow: `TOMORROW: Cycle Day ${tomorrowSession.num} — ${tomorrowSession.name}. ${getTomorrowShiftNote(tomorrowIdx)}
+Recommendation: "${tomorrowSessionRule.opt}" — ${tomorrowSessionRule.desc}${tomorrowShiftAheadNote ? '\n'+tomorrowShiftAheadNote : ''}`,
 
     todayLog:      todayCtx,
     yesterdayLog:  yCtx,
@@ -5224,7 +5239,7 @@ function dismissExportNudge() {
 }
 
 // Start
-const BUILD = 'v25 · ' + new Date().toISOString().slice(11,16);
+const BUILD = 'v26 · ' + new Date().toISOString().slice(11,16);
 try { document.getElementById('build-tag').textContent = 'build ' + BUILD; } catch(e){}
 
 checkFirstRun();
@@ -5242,8 +5257,8 @@ if(getAnthropicKey() && getSheetsKey()) {
 let _waitingSW = null;
 
 // NOTE: REPLACE this each deploy — do not prepend. The modal shows only the current update.
-const UPDATE_VERSION = 'v2.7 · Shift Awareness';
-const UPDATE_NOTES   = `Coach note fix: on a day you log a shifted session, the evening note no longer nags you about the original day's session as if there's still time tonight — a logged session is done, shifted or not. Also, when you note a plan like "doing Lift B tomorrow" in Session Notes, that plan now actually gets used for tomorrow's preview instead of the default cycle schedule.`;
+const UPDATE_VERSION = 'v2.8 · Tomorrow Fix';
+const UPDATE_NOTES   = `Coach note fix: shifting a session a day early (e.g. doing tomorrow's session type today) no longer leaves the next day's brief suggesting that same session again as if it weren't done — it now recommends the actual next session in the cycle instead.`;
 
 function showUpdateModal(worker) {
   _waitingSW = worker;
