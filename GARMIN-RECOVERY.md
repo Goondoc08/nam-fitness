@@ -23,18 +23,70 @@ node garmin-sync-recovery.js ~/Downloads/garmin-export.csv
 
 Garmin doesn't have a built-in "export all stats" feature, but you can use the **Health Stats** download:
 
-### Option A: Export from Garmin Connect Web (Recommended)
+### Option A: Export Activities to CSV (Most Reliable)
 
 1. Go to [connect.garmin.com](https://connect.garmin.com)
-2. Click **Menu → Health Stats** (or **Settings → Downloads**)
-3. Select **Health Stats Snapshot** or **Daily Summary**
-4. Choose date range that covers your missing dates
-5. Download as CSV
-6. Save as `~/Downloads/garmin-export.csv` (or any location)
+2. Click **Activities** (left sidebar)
+3. Use filters to select date range with missing data
+4. Select all activities (checkbox at top)
+5. Click **⋮ (More)** → **Export to CSV**
+6. Save as `~/Downloads/garmin-export.csv`
 
-### Option B: Garmin FitBit API (Advanced)
+**Note:** This exports your activity list (runs, swims, rides). For daily stats like VO₂ Max & SpO₂, see Option B.
 
-If you have Garmin API access set up, you can write a script to pull historical data directly. For now, use Option A.
+### Option B: Health Stats via Downloads (Newer Interface)
+
+1. Go to [connect.garmin.com](https://connect.garmin.com)
+2. Click **Menu (☰) → Downloads** or **Settings → Downloads**
+3. Look for **Health Statistics** or **Daily Summary**
+4. Select your date range
+5. Click **Download**
+6. Unzip and use the CSV file
+
+**Note:** Not all Garmin accounts have this option visible. If you don't see it, use Option A.
+
+### Option C: Manual Garmin Health Stats (Best for Missing Days)
+
+If automatic exports don't work:
+
+1. Go to [connect.garmin.com](https://connect.garmin.com)
+2. Click **Health Stats** (left sidebar)
+3. Scroll through your calendar and note the missing dates
+4. For each missing date, manually check:
+   - VO₂ Max (if available)
+   - Blood Oxygen / SpO₂
+   - Sleep data
+5. Use the script in **Read-Only Mode** (see below) to manually create a CSV with just those dates
+
+### Option D: Garmin API (Advanced)
+
+If you have a Garmin developer account with API access, you can pull historical data directly. For most users, Options A-C are simpler.
+
+---
+
+## Creating a Manual CSV (If You Can't Export)
+
+If Garmin doesn't give you a download option, create a simple CSV yourself:
+
+1. Open a text editor or Excel
+2. Create columns: `Date`, `VO2 Max`, `SpO2`, `Sleep`
+3. Fill in the missing dates and values you can find in Garmin Connect:
+   - **Date:** YYYY-MM-DD format (e.g., `2026-08-15`)
+   - **VO₂ Max:** Your VO₂ reading (e.g., `38.2`)
+   - **SpO₂:** Blood oxygen % (e.g., `96`)
+   - **Sleep:** Hours or minutes (e.g., `6.5` or `390`)
+4. Save as `recovery-data.csv`
+5. Run the script with that file
+
+Example CSV:
+```
+Date,VO2 Max,SpO2,Sleep
+2026-08-15,38.2,96,6.5
+2026-08-16,38.0,97,7.0
+2026-08-17,,96,6.8
+```
+
+**Note:** Leave fields blank if you don't have the data — the script only fills in what's there.
 
 ---
 
