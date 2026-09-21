@@ -1278,6 +1278,8 @@ input:checked ~ .toggle-slider-orange::before{background:var(--orange);transform
       <input type="file" id="import-file-input" accept="application/json" style="display:none" onchange="handleImportFile(event)">
       <button class="btn" onclick="document.getElementById('import-file-input').click()" style="width:100%;font-size:13px;background:rgba(0,229,255,.12);color:var(--swim);border:1px solid rgba(0,229,255,.25)">📥 Import Data from Export</button>
       <div style="font-size:11px;color:var(--text3);margin-top:6px;margin-bottom:12px">Restore logs from a previously exported JSON file — for moving to a new domain or recovering from a data wipe</div>
+      <button class="btn" id="backup-folder-btn" onclick="chooseBackupFolder()" style="width:100%;font-size:13px;background:rgba(0,229,255,.12);color:var(--swim);border:1px solid rgba(0,229,255,.25)">🗂️ Set Auto-Backup Folder</button>
+      <div style="font-size:11px;color:var(--text3);margin-top:6px;margin-bottom:12px" id="backup-folder-status">Not set — pick a Google Drive–synced folder and a JSON snapshot writes there automatically once a day. Chrome/Edge desktop only.</div>
       <button class="btn btn-outline btn-sm" onclick="clearAllData()" style="width:100%;font-size:12px;color:var(--lift);border-color:rgba(255,51,102,.3)">Clear all local data</button>
     </div>
   </div>
@@ -4935,9 +4937,7 @@ function renderRunningLog() {
 // ══════════════════════════════════════════════════════════
 //  EXPORT
 // ══════════════════════════════════════════════════════════
-async function exportData(opts = {}) {
-  const silent = !!opts.silent;
-  if(!silent) showToast('Building export…');
+async function buildExportPayload() {
   const out = {
     exportedAt: new Date().toISOString(),
     sessions: {}, lifestyle: {}, stretch: {}, on_demand: {},
@@ -4975,6 +4975,14 @@ async function exportData(opts = {}) {
     }
   } catch(e) { out.garmin = { error: e.message }; }
 
+  return out;
+}
+
+async function exportData(opts = {}) {
+  const silent = !!opts.silent;
+  if(!silent) showToast('Building export…');
+  const out = await buildExportPayload();
+
   const blob = new Blob([JSON.stringify(out, null, 2)], {type:'application/json'});
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
@@ -4992,18 +5000,108 @@ async function exportData(opts = {}) {
 
 // ══════════════════════════════════════════════════════════
 //  AUTO BACKUP — silent daily export, separate from the monthly
-//  "export for analysis" nudge above. Lands in the browser's default
-//  download folder; point that folder at a Google Drive sync folder
-//  to get an offsite copy without doing anything manually. This is
-//  what survives a "clear browsing data" wipe — localStorage doesn't.
+//  "export for analysis" nudge above. This is what survives a
+//  "clear browsing data" wipe — localStorage doesn't.
+//
+//  Preferred path: write straight into a folder the user picked via
+//  the File System Access API (e.g. a Google Drive sync folder) —
+//  scoped to just this app's backups, no directory handle stored
+//  anywhere but this browser's IndexedDB.
+//  Fallback: trigger a normal <a download> into the browser's default
+//  download folder, for browsers without File System Access support.
 // ══════════════════════════════════════════════════════════
-async function autoBackupIfNeeded() {
+
+const FS_DB_NAME = 'nam_fs', FS_STORE = 'handles', FS_KEY = 'backupDir';
+
+function fsDbOpen() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(FS_DB_NAME, 1);
+    req.onupgradeneeded = () => req.result.createObjectStore(FS_STORE);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function fsGetHandle() {
+  const db = await fsDbOpen();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(FS_STORE, 'readonly');
+    const req = tx.objectStore(FS_STORE).get(FS_KEY);
+    req.onsuccess = () => resolve(req.result || null);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function fsSetHandle(handle) {
+  const db = await fsDbOpen();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(FS_STORE, 'readwrite');
+    tx.objectStore(FS_STORE).put(handle, FS_KEY);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function chooseBackupFolder() {
+  if(!window.showDirectoryPicker) { showToast('Not supported in this browser — try Chrome or Edge on desktop'); return; }
+  try {
+    const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
+    await fsSetHandle(handle);
+    updateBackupFolderStatus();
+    showToast('Backup folder set ✓');
+    autoBackupIfNeeded(true);
+  } catch(e) { /* user cancelled the picker */ }
+}
+
+async function updateBackupFolderStatus() {
+  const el = document.getElementById('backup-folder-status');
+  if(!el) return;
+  try {
+    const handle = await fsGetHandle();
+    el.textContent = handle
+      ? `Backing up daily to "${handle.name}" — click above to change it`
+      : 'Not set — pick a Google Drive–synced folder and a JSON snapshot writes there automatically once a day. Chrome/Edge desktop only.';
+  } catch(e) { /* IndexedDB unavailable — leave default text */ }
+}
+
+// Builds the same export payload as exportData(), but writes it to a
+// FileSystemDirectoryHandle instead of triggering a browser download.
+async function writeBackupToFolder(handle) {
+  const perm = await handle.queryPermission({ mode: 'readwrite' });
+  if(perm !== 'granted') {
+    const req = await handle.requestPermission({ mode: 'readwrite' });
+    if(req !== 'granted') throw new Error('permission not granted');
+  }
+  const out = await buildExportPayload();
+  const fileHandle = await handle.getFileHandle(`nam-export-${todayISO()}.json`, { create: true });
+  const writable = await fileHandle.createWritable();
+  await writable.write(JSON.stringify(out, null, 2));
+  await writable.close();
+}
+
+async function autoBackupIfNeeded(force) {
   const today = todayISO();
-  if(S.get('last_auto_backup') === today) return;
+  if(!force && S.get('last_auto_backup') === today) return;
+
+  let handle = null;
+  try { handle = await fsGetHandle(); } catch(e) { /* IndexedDB unavailable */ }
+
+  if(handle) {
+    try {
+      await writeBackupToFolder(handle);
+      S.set('last_auto_backup', today);
+      if(force) showToast('Backed up ✓');
+      return;
+    } catch(e) {
+      // Permission lost or folder moved/deleted — fall through to the
+      // download fallback so a backup still happens today.
+    }
+  }
+
   try {
     await exportData({ silent: true });
     S.set('last_auto_backup', today);
-    showToast('Backed up to Downloads ✓');
+    if(force) showToast('Backed up to Downloads ✓');
   } catch(e) { /* silently retry on next load */ }
 }
 
@@ -5249,6 +5347,7 @@ try { document.getElementById('build-tag').textContent = 'build ' + BUILD; } cat
 
 checkFirstRun();
 checkExportNudge();
+updateBackupFolderStatus();
 autoBackupIfNeeded();
 if(getAnthropicKey() && getSheetsKey()) {
   init();
