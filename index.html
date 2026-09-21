@@ -4935,8 +4935,9 @@ function renderRunningLog() {
 // ══════════════════════════════════════════════════════════
 //  EXPORT
 // ══════════════════════════════════════════════════════════
-async function exportData() {
-  showToast('Building export…');
+async function exportData(opts = {}) {
+  const silent = !!opts.silent;
+  if(!silent) showToast('Building export…');
   const out = {
     exportedAt: new Date().toISOString(),
     sessions: {}, lifestyle: {}, stretch: {}, on_demand: {},
@@ -4982,9 +4983,28 @@ async function exportData() {
   a.click();
   URL.revokeObjectURL(url);
 
-  S.set('last_export_month', todayISO().slice(0,7));
-  document.getElementById('export-nudge').style.display = 'none';
-  showToast('Export downloaded ✓');
+  if(!silent) {
+    S.set('last_export_month', todayISO().slice(0,7));
+    document.getElementById('export-nudge').style.display = 'none';
+    showToast('Export downloaded ✓');
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+//  AUTO BACKUP — silent daily export, separate from the monthly
+//  "export for analysis" nudge above. Lands in the browser's default
+//  download folder; point that folder at a Google Drive sync folder
+//  to get an offsite copy without doing anything manually. This is
+//  what survives a "clear browsing data" wipe — localStorage doesn't.
+// ══════════════════════════════════════════════════════════
+async function autoBackupIfNeeded() {
+  const today = todayISO();
+  if(S.get('last_auto_backup') === today) return;
+  try {
+    await exportData({ silent: true });
+    S.set('last_auto_backup', today);
+    showToast('Backed up to Downloads ✓');
+  } catch(e) { /* silently retry on next load */ }
 }
 
 // ══════════════════════════════════════════════════════════
@@ -5229,6 +5249,7 @@ try { document.getElementById('build-tag').textContent = 'build ' + BUILD; } cat
 
 checkFirstRun();
 checkExportNudge();
+autoBackupIfNeeded();
 if(getAnthropicKey() && getSheetsKey()) {
   init();
 } else {
