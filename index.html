@@ -1803,6 +1803,18 @@ function getGreeting() {
 }
 function n(v) { return v !== null && v !== undefined && v !== '' ? Number(v) : null; }
 
+// The snapshot's sleep, stage, readiness and nightly-HRV cells are the night woken from on the
+// snapshot's OWN date. If the snapshot hasn't been rewritten yet today (date < today, e.g. the
+// NAS is down), they are an earlier night's — blank them so they can't pass as last night's.
+// Fails open: no date column, or a date of today or later, leaves the snapshot untouched.
+function todaysSnap(snap) {
+  if(!snap || !snap.date || snap.date >= todayISO()) return snap;
+  const out = { ...snap };
+  ['sleep_hrs','sleep_score','deep_min','rem_min','light_min','awake_min','training_readiness','hrv_night_ms','nap_min']
+    .forEach(f => { out[f] = ''; });
+  return out;
+}
+
 // Escape user-entered free text before injecting into innerHTML (notes can contain < " etc.)
 function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, c =>
@@ -2018,7 +2030,8 @@ let currentBB = null; // live body battery — display only
 let wakeBB    = null; // wake body battery — used for all training recommendations
 
 function renderMetrics(data) {
-  const { snap, activities } = data;
+  const { activities } = data;
+  const snap = todaysSnap(data.snap);
   if(!snap) return;
 
   // Body Battery — bb_current for display, bb_wake for all training decisions
@@ -3763,7 +3776,7 @@ function notePeriod() {
   if(h < 5)   return null; // overnight — no note yet
   if(h < 8)   return 'waiting'; // firm floor — Garmin sync isn't reliably complete before 0800
 
-  const snap      = sheetDataGlobal?.snap || {};
+  const snap      = todaysSnap(sheetDataGlobal?.snap) || {};
   const hasBBWake = !isNaN(parseFloat(snap.bb_wake));
   const hasSleep  = !isNaN(parseFloat(snap.sleep_hrs));
 
@@ -3946,7 +3959,7 @@ function renderBPCard() {
 }
 
 function buildAIContext(data) {
-  const snap = data?.snap || {};
+  const snap = todaysSnap(data?.snap) || {};
   const acts = data?.activities || [];
   const idx  = getCycleIdx();
   const day  = DAYS[idx];
@@ -4032,11 +4045,16 @@ function buildAIContext(data) {
   const bbWake    = parseFloat(snap.bb_wake)    || null;
   const bbCurrent = parseFloat(snap.bb_current) || null;
   const hrv       = parseFloat(snap.hrv_ms)            || null;
+  const hrvNight  = parseFloat(snap.hrv_night_ms)      || null;
   const sleepHrs  = parseFloat(snap.sleep_hrs)         || null;
   const sleepScore= parseFloat(snap.sleep_score)       || null;
   const deepMin   = parseFloat(snap.deep_min)          || null;
   const remMin    = parseFloat(snap.rem_min)           || null;
-  const readiness = snap.training_readiness            || '—';
+  // Readiness is this morning's and stays blank until Garmin has processed last night —
+  // it no longer falls back to yesterday's, so say so rather than showing a bare dash.
+  const readiness = !isNaN(parseFloat(snap.training_readiness))
+    ? snap.training_readiness
+    : 'not available yet — do not cite or estimate it';
   const status    = snap.training_status               || '—';
   const restHR    = snap.resting_hr                    || '—';
   const stress    = snap.avg_stress                    || '—';
@@ -4045,32 +4063,45 @@ function buildAIContext(data) {
   const noWakeFlag  = !bbWake   ? ' ⚠️ Wake BB unavailable.' : '';
   const noSleepFlag = !sleepHrs ? ' ⚠️ Sleep data not yet available.' : '';
 
+  // ── HRV series from the daily log (newest first) ───────────
+  // hrv_ms is Garmin's 7-day weekly average, so averaging it gives an average of averages.
+  // Use hrv_night_ms (that morning's last-night average) when at least minNightly nights have
+  // it; otherwise fall back to hrv_ms and let the text say it is the weekly average.
+  // Last night's value lives only in the snapshot until tomorrow's 6 AM run writes today's
+  // row, so it leads the nightly series (taking one slot of the window) when present.
+  function getHRVSeries(days, minNightly) {
+    const pick = (key, todayVal) => {
+      const vals = [];
+      if(todayVal !== undefined && !isNaN(todayVal) && todayVal > 0) vals.push(todayVal);
+      const span = days - vals.length;
+      for(let i = 1; i <= span; i++) {
+        const r = (data.daily || []).find(d => d.date === offsetISO(-i));
+        const v = parseFloat(r?.[key]);
+        if(!isNaN(v) && v > 0) vals.push(v);
+      }
+      return vals;
+    };
+    const nightly = pick('hrv_night_ms', parseFloat(snap.hrv_night_ms));
+    if(nightly.length >= minNightly) return { vals: nightly, src: 'nightly HRV' };
+    return { vals: pick('hrv_ms'), src: "Garmin's 7-day weekly-average HRV, not nightly values" };
+  }
+
   // ── HRV 7-day trend from daily log ─────────────────────────
   function getHRVTrend() {
-    const vals = [];
-    for(let i = 1; i <= 7; i++) {
-      const r = (data.daily || []).find(d => d.date === offsetISO(-i));
-      const v = parseFloat(r?.hrv_ms);
-      if(!isNaN(v) && v > 0) vals.push(v);
-    }
+    const { vals, src } = getHRVSeries(7, 5);
     if(vals.length < 3) return null;
     const avg   = vals.reduce((a,b)=>a+b,0) / vals.length;
     const recent = vals.slice(0,3).reduce((a,b)=>a+b,0) / 3;
-    if(recent > avg + 1.5) return `trending up (7d avg ${Math.round(avg)}ms)`;
-    if(recent < avg - 1.5) return `trending down (7d avg ${Math.round(avg)}ms)`;
-    return `stable (7d avg ${Math.round(avg)}ms)`;
+    if(recent > avg + 1.5) return `trending up (7d avg ${Math.round(avg)}ms of ${src})`;
+    if(recent < avg - 1.5) return `trending down (7d avg ${Math.round(avg)}ms of ${src})`;
+    return `stable (7d avg ${Math.round(avg)}ms of ${src})`;
   }
 
   // ── HRV 30-day rolling baseline — self-updating, never hardcoded ─
   function getHRVBaseline() {
-    const vals = [];
-    for(let i = 1; i <= 30; i++) {
-      const r = (data.daily || []).find(d => d.date === offsetISO(-i));
-      const v = parseFloat(r?.hrv_ms);
-      if(!isNaN(v) && v > 0) vals.push(v);
-    }
+    const { vals, src } = getHRVSeries(30, 5);
     if(vals.length < 5) return null;
-    return Math.round(vals.reduce((a,b)=>a+b,0) / vals.length);
+    return `${Math.round(vals.reduce((a,b)=>a+b,0) / vals.length)}ms of ${src}`;
   }
 
   // ── BB flag — only a true signal, not routine daily fluctuation ─
@@ -4120,7 +4151,8 @@ function buildAIContext(data) {
     const avgBB = bbWakes.length
       ? Math.round(bbWakes.reduce((a,b)=>a+b,0)/bbWakes.length)
       : '—';
-    return `Last 7 days: ${sessionsLogged} sessions logged · ${totalDrinks} drinks total · avg sleep ${avgSleep}hrs · avg wake BB ${avgBB}`;
+    // A daily row's sleep_hrs is the night he woke up from on that row's date.
+    return `Last 7 days: ${sessionsLogged} sessions logged · ${totalDrinks} drinks total · avg sleep ${avgSleep}hrs (the night ending each morning) · avg wake BB ${avgBB}`;
   }
 
   // ── Block adherence ────────────────────────────────────────
@@ -4304,7 +4336,7 @@ function buildAIContext(data) {
 
     metrics: `Cycle ${weekNum} of 12. ${blockAdh}. THIS CYCLE'S ADHERENCE (use this exact figure for any "this week/cycle" comment — do not recompute or invent a different number): ${cycleAdh}.
 Cycle Day ${day.num} — ${day.name}. ${getShiftPosition(idx)}
-BB wake: ${bbWake ?? '—'}${noWakeFlag} | BB current: ${bbCurrent ?? '—'} | HRV: ${hrv ?? '—'}ms${hrvTrend ? ' ('+hrvTrend+')' : ''}${hrvBaseline ? ` | 30d HRV baseline: ${hrvBaseline}ms` : ''}
+BB wake: ${bbWake ?? '—'}${noWakeFlag} | BB current: ${bbCurrent ?? '—'} | HRV (Garmin 7-day weekly avg): ${hrv ?? '—'}ms${hrvNight ? ` | HRV last night: ${hrvNight}ms` : ''}${hrvTrend ? ' ('+hrvTrend+')' : ''}${hrvBaseline ? ` | 30d HRV baseline: ${hrvBaseline}` : ''}
 BB flag: ${bbFlagInfo.flag ? `YES — ${bbFlagInfo.reason}` : 'No — normal range, do not call out'}
 Sleep: ${sleepHrs ?? '—'} hrs · score ${sleepScore ?? '—'}/100 · deep ${deepMin ?? '—'} min · REM ${remMin ?? '—'} min${noSleepFlag}
 Readiness: ${readiness} | Status: ${status} | VO₂: ${vo2} | Resting HR: ${restHR} | Stress: ${stress}
@@ -4352,7 +4384,7 @@ async function generateDailyBrief(forceRefresh = false, cacheOnly = false) {
   }
 
   if(period === 'waiting') {
-    const snap2   = sheetDataGlobal?.snap || {};
+    const snap2   = todaysSnap(sheetDataGlobal?.snap) || {};
     const missing = [!parseFloat(snap2.bb_wake) && 'wake BB', !parseFloat(snap2.sleep_hrs) && 'sleep data'].filter(Boolean).join(' & ');
     if(labelEl) labelEl.textContent = 'Morning Note';
     if(textEl)  textEl.innerHTML = `
@@ -4613,25 +4645,17 @@ function renderTrends(data) {
   renderRunningLog();
 
   // ── Sparklines ─────────────────────────────────────────
-  // Build last7 from daily log rows, then overlay today's snapshot sleep data
-  // since sleep lives in the snapshot until tomorrow's 6 AM full sync writes it to the daily row.
+  // Every daily row's columns belong to its own date (sleep = the night woken from that
+  // morning), so yesterday's row already holds yesterday's own sleep. Today's sleep lives only
+  // in the snapshot until tomorrow's 6 AM full sync writes today's row — add it as a today
+  // point, and only when the snapshot is dated today and Garmin has produced a score yet.
   const snap = data?.snap || {};
-  const last7raw = daily.filter(r=>r.date).sort((a,b)=>a.date.localeCompare(b.date)).slice(-7);
-  // Sleep lives in the snapshot until tomorrow's 6 AM full sync writes it to the daily row.
-  // The most recent daily row is yesterday's date — overlay snapshot sleep onto it if missing.
-  const mostRecentDate = last7raw.length ? last7raw[last7raw.length - 1].date : null;
-  const last7 = last7raw.map(r => {
-    if(r.date !== mostRecentDate) return r;
-    return {
-      ...r,
-      sleep_score: n(r.sleep_score) !== null ? r.sleep_score : (snap.sleep_score || r.sleep_score),
-      sleep_hrs:   n(r.sleep_hrs)   !== null ? r.sleep_hrs   : (snap.sleep_hrs   || r.sleep_hrs),
-      deep_min:    n(r.deep_min)    !== null ? r.deep_min    : (snap.deep_min    || r.deep_min),
-      rem_min:     n(r.rem_min)     !== null ? r.rem_min     : (snap.rem_min     || r.rem_min),
-    };
-  });
+  const last7 = daily.filter(r=>r.date).sort((a,b)=>a.date.localeCompare(b.date)).slice(-7);
+  const todaySleep = (snap.date === todayISO() && n(snap.sleep_score) !== null && !last7.some(r => r.date === snap.date))
+    ? [{ date: snap.date, sleep_score: snap.sleep_score, sleep_hrs: snap.sleep_hrs, deep_min: snap.deep_min, rem_min: snap.rem_min }]
+    : [];
   const hrvVals   = last7.map(r=>n(r.hrv_ms)).filter(v=>v!==null);
-  const sleepVals = last7.map(r=>n(r.sleep_score)).filter(v=>v!==null);
+  const sleepVals = [...last7, ...todaySleep].slice(-7).map(r=>n(r.sleep_score)).filter(v=>v!==null);
   const bbVals    = last7.map(r=>n(r.bb_wake)??n(r.bb_high)).filter(v=>v!==null);
   const hrVals    = last7.map(r=>n(r.resting_hr)).filter(v=>v!==null);
 
@@ -4765,7 +4789,10 @@ function renderInsights(daily) {
     nextDate.setDate(nextDate.getDate()+1);
     const next = rowMap[nextDate.toISOString().slice(0,10)];
     if(!next) return;
-    const hrv=n(next.hrv_ms), sleep=n(next.sleep_score), bb=n(next.bb_wake)??n(next.bb_high);
+    // Row D+1 is the morning after log day D: its sleep and wake BB are the night after D.
+    // hrv_night_ms is that night's HRV; hrv_ms is a 7-day weekly average that barely moves
+    // after one drink, so it is only the fallback for rows the backfill hasn't filled yet.
+    const hrv=n(next.hrv_night_ms)??n(next.hrv_ms), sleep=n(next.sleep_score), bb=n(next.bb_wake)??n(next.bb_high);
     if(hrv!==null)  (log.etoh>0?etohHRV.y:etohHRV.n).push(hrv);
     if(sleep!==null && log.caffeineTime) (['2-4','4-6','after-6'].includes(log.caffeineTime)?cafSleep.late:cafSleep.early).push(sleep);
     if(hrv!==null)  (log.highAcuity?acuityHRV.y:acuityHRV.n).push(hrv);
@@ -5344,7 +5371,7 @@ function dismissExportNudge() {
 }
 
 // Start
-const BUILD = 'v25 · ' + new Date().toISOString().slice(11,16);
+const BUILD = 'v26 · ' + new Date().toISOString().slice(11,16);
 try { document.getElementById('build-tag').textContent = 'build ' + BUILD; } catch(e){}
 
 checkFirstRun();
@@ -5364,8 +5391,8 @@ if(getAnthropicKey() && getSheetsKey()) {
 let _waitingSW = null;
 
 // NOTE: REPLACE this each deploy — do not prepend. The modal shows only the current update.
-const UPDATE_VERSION = 'v2.7 · Shift Awareness';
-const UPDATE_NOTES   = `Coach note fix: on a day you log a shifted session, the evening note no longer nags you about the original day's session as if there's still time tonight — a logged session is done, shifted or not. Also, when you note a plan like "doing Lift B tomorrow" in Session Notes, that plan now actually gets used for tomorrow's preview instead of the default cycle schedule.`;
+const UPDATE_VERSION = 'v2.8 · Sheet Dates';
+const UPDATE_NOTES   = `Garmin sheet dates: the sheet now files each day's sleep and readiness on that day's own row, so the app reads them that way. Today's sleep shows on the sleep sparkline as today, and a blank morning readiness reads "not available yet" instead of borrowing yesterday's. HRV trend, baseline and the alcohol/acuity insights now use last night's HRV where the sheet has it, not the weekly average.`;
 
 function showUpdateModal(worker) {
   _waitingSW = worker;
